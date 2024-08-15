@@ -19,8 +19,8 @@ target_sources(rendermesh PRIVATE
     main.cpp
     complex_model.cpp
     complex_model.h
-        meshes_buffer.cpp
-        meshes_buffer.h
+    meshes_buffer.cpp
+    meshes_buffer.h
     main_window.cpp
     main_window.h
     render.cpp

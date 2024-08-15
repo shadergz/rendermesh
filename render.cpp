@@ -1,4 +1,5 @@
 #include <string>
+#include <chrono>
 #define GL_GLEXT_PROTOTYPES
 #include <SDL2/SDL_opengl.h>
 #include <imgui.h>
@@ -8,7 +9,7 @@
 
 #include <render.h>
 namespace rendermesh {
-    constexpr auto maxOfLoadableModel{1};
+    constexpr auto maxOfLoadableModel{12};
     Render::Render(MainWindow& main) :
         window(main) {
 
@@ -58,12 +59,14 @@ namespace rendermesh {
             }
         };
         using FasterClock = std::chrono::time_point<std::chrono::high_resolution_clock>;
-        using DiffTicks = std::chrono::duration<f32>;
         using GetTicks = std::chrono::high_resolution_clock;
 
         FasterClock beginTime{};
         FasterClock endTime{};
         f32 deltaTime{};
+        f32 acc{};
+        f32 fps{};
+        f32 frames{};
 
         std::array<f32, 200> framesSamples{};
         u32 sample{};
@@ -90,7 +93,12 @@ namespace rendermesh {
                 }
                 ImGui::EndMenuBar();
             }
-            const auto fps{deltaTime * 1000.f};
+
+            acc += deltaTime;
+            if (acc > 1000.f) {
+                fps = frames;
+                frames = acc = {};
+            }
             if (sample > sizeof(framesSamples) / sizeof(f32))
                 sample = 0;
 
@@ -113,7 +121,9 @@ namespace rendermesh {
             endTime = GetTicks::now();
             SDL_GL_SwapWindow(window.main);
 
-            deltaTime = DiffTicks(endTime - beginTime).count();
+            frames++;
+
+            deltaTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - beginTime).count();
         }
     }
 

@@ -74,9 +74,9 @@ namespace rendermesh {
     void MeshesBuffer::bindMeshModel(const u32 model) {
         auto position{std::begin(pipelines)};
         std::advance(position, model);
-
         texture = position->texture;
         ebo = position->ebo;
+
         vbo = position->vbo;
     }
 }

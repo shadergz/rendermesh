@@ -30,7 +30,7 @@ namespace rendermesh {
         u32 shapeIndex{};
 
         for (auto& modelMesh : meshes) {
-            if (shapes.size() < shapeIndex)
+            if (shapes.size() <= shapeIndex)
                 continue;
 
             auto& currShape{shapes[shapeIndex]};
@@ -39,8 +39,21 @@ namespace rendermesh {
             std::string texName;
             buildTriangles(currShape, modelMesh, attributes.vertices, attributes.normals, attributes.texcoords);
 
-            if (modelMesh.textured < materials.size())
+            if (modelMesh.textured < materials.size()) {
                 texName = materials[modelMesh.textured].diffuse_texname;
+                if (texName.empty())
+                    texName = materials[modelMesh.textured].bump_texname;
+
+                while (texName.find('\\') != std::string::npos) {
+                    auto begin{texName.find('\\')};
+                    auto end{begin};
+                    while (texName[end] == '\\')
+                        end++;
+
+                    texName[begin] = '/';
+                    texName.erase(begin + 1, end - begin - 1);
+                }
+            }
 
             getTextureName(modelMesh.texture, path, texName);
             modelMesh.isEnb = true;
