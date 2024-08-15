@@ -8,12 +8,11 @@
 
 #include <mesh/complex.h>
 namespace rendermesh::mesh {
-    Complex::Complex(const std::shared_ptr<buffer::Submit>& submit, const std::filesystem::path& path) :
-        submitter(submit) {
+    Complex::Complex(const std::shared_ptr<buffer::Submit>& submit,
+        const std::filesystem::path& path) :
+        buffers(submit) {
 
         std::fstream model(path);
-        if (!model.is_open()) {
-        }
         if (path.has_parent_path()) {
             objDir = path.parent_path();
         }
@@ -23,41 +22,32 @@ namespace rendermesh::mesh {
             throw std::runtime_error(std::format("Assimp: {}", importer.GetErrorString()));
         }
 
-        Model mesh{};
-        u32& parent{mesh.parent};
-        u32& depth{mesh.depth};
-
-        aiVector3D scaling,
-            translation;
-        aiQuaternion rotation;
-
-        std::function<void(const aiNode&, aiMatrix4x4&)> processAiNode =
+        u32 parent{};
+        u32 depth{};
+        std::function<void(const aiNode&, const aiMatrix4x4&)> processAiNode =
                 [&](const aiNode& node, const aiMatrix4x4& transform) {
-            auto nodeTransform{transform * node.mTransformation};
+            const auto nodeTransform{transform * node.mTransformation};
+            if (!node.mMeshes) {
+                parent++;
+            }
+            NodeTransform space{parent, depth, nodeTransform};
 
             for (const auto aiMesh : std::span(node.mMeshes, node.mNumMeshes)) {
                 const auto implMesh{scene->mMeshes[aiMesh]};
-                depth++;
-                processMesh(mesh, *implMesh, *scene);
-                nodeTransform.Decompose(scaling, rotation, translation);
+                space.domain = Local;
 
-                mesh.scale = glm::vec3(scaling.x, scaling.y, scaling.z);
-                mesh.position = glm::vec3(translation.x, translation.y, translation.z);
-                mesh.rotation = glm::quat(rotation.w, rotation.x, rotation.y, rotation.z);
-
-                mesh.pipeline = submitter->buffers.generate();
-                meshes.emplace_back(std::move(mesh));
+                Model moldable{static_cast<u32>(transforms.size()), buffers->buffers.generate()};
+                processMesh(moldable, *implMesh, *scene);
+                meshes.emplace_back(std::move(moldable));
             }
+            transforms.emplace_back(space);
 
             for (const auto children : std::span(node.mChildren, node.mNumChildren)) {
-                depth = {};
-                if (children->mMeshes)
-                    parent++;
+                depth++;
                 processAiNode(*children, nodeTransform);
             }
         };
-        aiMatrix4x4 transform{};
-        processAiNode(*scene->mRootNode, transform);
+        processAiNode(*scene->mRootNode, aiMatrix4x4());
     }
     void Complex::populateBuffers() const {
         struct ReusableTextures {
@@ -66,8 +56,7 @@ namespace rendermesh::mesh {
         };
         std::vector<ReusableTextures> current;
         for (const auto& mesh : meshes) {
-            submitter->bindMeshModel(mesh.pipeline);
-
+            buffers->bindMeshModel(mesh.pipeline);
             for (const auto& textures : mesh.textures) {
                 const std::filesystem::path& path{textures.path};
 
@@ -77,55 +66,46 @@ namespace rendermesh::mesh {
                         reusing = loaded;
                     }
                 }
-                if (reusing.path.empty()) {
-                    submitter->loadTexture(mesh.identifier, textures);
-                    current.emplace_back(path, mesh.pipeline);
-                } else {
+                if (!is_empty(reusing.path)) {
                     std::print("The texture {} has already been loaded previously\n", path.string());
-                    submitter->buffers.reuse(mesh.pipeline, reusing.pipe);
-                    submitter->mixTexture(mesh.identifier, textures);
+                    buffers->reuseTexture(mesh.pipeline, reusing.pipe);
+                    buffers->mixTexture(mesh.identifier, textures);
+                } else {
+                    buffers->loadTexture(mesh.identifier, textures);
+                    current.emplace_back(path, mesh.pipeline);
                 }
 
-                submitter->bindBuffer(mesh.triangles, mesh.indices);
+                buffers->bindVertexObjects(mesh.triangles, mesh.indices);
             }
         }
     }
 
     void Complex::draw() const {
-        static std::unordered_map<u32, glm::mat4> parents;
         for (const auto& mesh : meshes) {
             glm::mat4 nodeMatrix{1.0f};
-
-            if (!parents.contains(mesh.parent)) {
-                parents[mesh.parent] = toMat4(mesh.rotation);
-            }
-
-            submitter->bindMeshModel(mesh.pipeline);
+            buffers->bindMeshModel(mesh.pipeline);
             // Due to the way the GLTF format is structured, we must multiply the matrices of child nodes
             // by that of the highest-level parent
-            nodeMatrix = translate(nodeMatrix, mesh.position);
-            nodeMatrix *= toMat4(mesh.rotation);
+            const auto position{transforms[mesh.level].position};
+            const auto scaleEye{transforms[mesh.level].scale};
 
-            if (mesh.parent) {
-                i64 upward{mesh.parent};
-                while (upward >= 0) {
-                    if (parents.contains(upward))
-                        nodeMatrix *= parents[upward--];
-                    else
-                        upward--;
-                }
-            } else {
-                nodeMatrix *= parents[0];
+            i64 level{mesh.level};
+            for (; level >= 0; level--) {
+                while (transforms[level].domain != Global)
+                    level--;
+                nodeMatrix *= toMat4(transforms[level].rotation);
             }
-            nodeMatrix = scale(nodeMatrix, mesh.scale);
-            submitter->accMvp(nodeMatrix);
-            submitter->drawBuffers(mesh.identifier, mesh.indices.size());
+            nodeMatrix *= toMat4(transforms[mesh.level].rotation);
+            nodeMatrix = translate(nodeMatrix, position);
+
+            nodeMatrix = scale(nodeMatrix, scaleEye);
+            buffers->accMvp(nodeMatrix);
+            buffers->drawObjects(mesh.identifier, mesh.indices.size());
         }
     }
 
     void Complex::processMesh(Model& modelMesh,
         const aiMesh& implMesh, const aiScene& scene) const {
-
         std::unordered_map<buffer::Vertex, u32, buffer::HashVertex> uniqueVertices;
         auto& triangles{modelMesh.triangles};
         auto& indices{modelMesh.indices};
@@ -133,7 +113,6 @@ namespace rendermesh::mesh {
         modelMesh.identifier = std::hash<std::string>()(std::string(implMesh.mName.data, std::strlen(implMesh.mName.data)));
 
         const auto vertices{std::span(implMesh.mVertices, implMesh.mNumVertices)};
-
         std::span<aiVector3D> normals{};
         if (implMesh.mNormals) {
             normals = std::span(implMesh.mNormals, implMesh.mNumVertices);
@@ -144,7 +123,6 @@ namespace rendermesh::mesh {
         }
 
         for (u32 verticesCount{}; verticesCount < implMesh.mNumVertices; verticesCount++) {
-
             buffer::Vertex vertex{};
             vertex.position = {
                 vertices[verticesCount].x,
@@ -185,7 +163,6 @@ namespace rendermesh::mesh {
             textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
             textures.insert(textures.end(), emissiveMaps.begin(), emissiveMaps.end());
         }
-
         std::print("Total triangles obtained: {}\n", triangles.size());
         std::print("Total indices obtained: {}\n", indices.size());
     }
@@ -193,9 +170,8 @@ namespace rendermesh::mesh {
     std::vector<buffer::Texture> Complex::getTextureMaps(
         const aiMaterial& material, const aiTextureType type) const {
         std::vector<buffer::Texture> textures;
-
         if (objDir.empty())
-            throw std::runtime_error("");
+            throw std::runtime_error("File system failure");
 
         buffer::Texture meshMaterial;
         for (u32 matIndex{}; matIndex < material.GetTextureCount(type); matIndex++) {

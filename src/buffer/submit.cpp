@@ -4,7 +4,7 @@
 
 #include <buffer/submit.h>
 namespace rendermesh::buffer {
-    void Submit::bindBuffer(const std::vector<Vertex>& triangles, const std::vector<GLuint>& indices) const {
+    void Submit::bindVertexObjects(const std::vector<Vertex>& triangles, const std::vector<GLuint>& indices) const {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
@@ -42,15 +42,13 @@ namespace rendermesh::buffer {
         glUniformMatrix4fv(mvpVar, 1, GL_FALSE, &mvp[0][0]);
     }
 
-    void Submit::drawBuffers(const u64 meshHash, const u32 indices) {
+    void Submit::drawObjects(const u64 meshHash, const u32 indices) {
         // Binds the texture to our object in the fragment shader
-        const auto& materials{blend[meshHash]};
-        if (!blend.contains(meshHash))
-            throw std::runtime_error("Blend not in use");
-
-        materials.bind(shader, aiTextureType_DIFFUSE);
-        materials.bind(shader, aiTextureType_SPECULAR);
-        materials.bind(shader, aiTextureType_EMISSIVE);
+        if (blend.contains(meshHash)) {
+            blend[meshHash].bind(shader, aiTextureType_DIFFUSE);
+            blend[meshHash].bind(shader, aiTextureType_SPECULAR);
+            blend[meshHash].bind(shader, aiTextureType_EMISSIVE);
+        }
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
@@ -100,6 +98,16 @@ namespace rendermesh::buffer {
         glBindTexture(GL_TEXTURE_2D, 0);
         SDL_FreeSurface(target);
         SDL_FreeSurface(source);
+    }
+
+    void Submit::reuseTexture(const u32 dest, const GLuint src) const {
+        auto& target{buffers[dest].texture};
+        const auto& source{buffers[src].texture};
+
+        if (target != source)
+            glDeleteTextures(1, &target);
+
+        target = source;
     }
 
     void Submit::mixTexture(const u64 meshHash, const Texture& resource) {

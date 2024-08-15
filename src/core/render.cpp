@@ -11,33 +11,19 @@
 #include <backends/imgui_impl_sdl2.h>
 
 #include <core/render.h>
+#include <core/filter.h>
 namespace rendermesh::core {
     Render::Render(window::MainWindow& main) :
         window(main) {
 
-        GLint extensions;
-        glGetIntegerv(GL_NUM_EXTENSIONS, &extensions);
-        std::vector<std::string> supported;
-        for (u32 ext{}; ext < extensions; ext++) {
-            const auto name{glGetStringi(GL_EXTENSIONS, ext)};
-            if (name)
-                supported.push_back(reinterpret_cast<const char*>(name));
-        }
-        // Checking if the host supports anisotropic filtering functionality
-        GLfloat amount;
-        bool enbAFilter{};
-        if (std::ranges::find(supported, "GL_EXT_texture_filter_anisotropic") != supported.end()) {
-            glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &amount);
-            enbAFilter = true;
-        }
-
-        pipeline = buffer::Pipeline(enbAFilter, amount);
+        const auto [enb, count] = getAnisotropicFilter();
+        pipeline = buffer::Pipeline(enb, count);
 
         i32 h, w;
         SDL_GetWindowSize(window.main, &w, &h);
 
         shader = std::make_shared<raster::Shaders>();
-        submitter = std::make_shared<buffer::Submit>(shader, pipeline);
+        buffers = std::make_shared<buffer::Submit>(shader, pipeline);
         camera = view::Camera(static_cast<f32>(h), static_cast<f32>(w));
 
         glEnable(GL_MULTISAMPLE);
@@ -75,7 +61,6 @@ namespace rendermesh::core {
             beginTime = GetTicks::now();
 
             shader->activate();
-
             if (selected.empty())
                 if (files.size())
                     open(files.back());
@@ -87,21 +72,18 @@ namespace rendermesh::core {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             draw(camera.getViewMatrix());
-
             endTime = GetTicks::now();
             SDL_GL_SwapWindow(window.main);
 
             frames++;
-
             deltaTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - beginTime).count();
-
             shader->drop();
         }
     }
 
     void Render::initialize(const std::vector<char*>& args) {
         for (const auto argument : args) {
-            for (const auto desired : {".obj", ".gltf", ".glb"}) {
+            for (const auto desired : {".gltf", ".glb"}) {
                 if (std::string_view(desired) == std::filesystem::path(argument).extension()) {
                     const auto file{std::filesystem::canonical(argument)};
                     if (std::ranges::find(files, file) != files.end())
@@ -121,8 +103,8 @@ namespace rendermesh::core {
 
         if (mesh)
             mesh.reset();
-        submitter->reset();
-        mesh = std::make_unique<mesh::Complex>(submitter, path);
+        buffers->reset();
+        mesh = std::make_unique<mesh::Complex>(buffers, path);
         mesh->populateBuffers();
 
         selected = path;
@@ -141,7 +123,7 @@ namespace rendermesh::core {
             if (ImGui::BeginMenu("File")) {
                 if (ImGui::MenuItem("Open", "Ctrl+O")) {
                     const IGFD::FileDialogConfig config{.path = "."};
-                    fileDialog->OpenDialog("ChooseFileDlgKey", "Choose File", ".obj,.gltf,.glb", config);
+                    fileDialog->OpenDialog("ChooseFileDlgKey", "Choose File", ".gltf,.glb", config);
                 }
                 ImGui::EndMenu();
             }
@@ -201,16 +183,14 @@ namespace rendermesh::core {
 
     void Render::draw(const glm::mat4& view) {
         drawUi();
-
         // All the drawing work is done here
         pipeline.bind();
-        submitter->accMvp(view, true);
+        buffers->accMvp(view, true);
 
         if (mesh)
             mesh->draw();
 
         pipeline.flush();
-
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     }

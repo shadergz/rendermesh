@@ -12,12 +12,12 @@ namespace rendermesh::mesh {
         void populateBuffers() const;
         void draw() const;
     private:
-        std::shared_ptr<buffer::Submit> submitter;
+        std::shared_ptr<buffer::Submit> buffers;
         std::vector<Model> meshes;
+        std::vector<NodeTransform> transforms;
 
         void processMesh(Model& modelMesh, const aiMesh& implMesh, const aiScene& scene) const;
         std::vector<buffer::Texture> getTextureMaps(const aiMaterial& material, aiTextureType type) const;
-
-         std::filesystem::path objDir;
+        std::filesystem::path objDir;
     };
 }

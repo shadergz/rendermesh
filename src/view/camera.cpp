@@ -41,7 +41,6 @@ namespace rendermesh::view {
 
         constexpr auto sensitivity{0.305f};
         mouseDelta *= sensitivity;
-
         yaw += mouseDelta.x;
         pitch += mouseDelta.y;
 

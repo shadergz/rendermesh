@@ -40,16 +40,6 @@ namespace rendermesh::buffer {
         return pipe;
     }
 
-    void Pipeline::reuse(const u32 dest, const GLuint src) {
-        auto& target{operator[](dest).texture};
-        const auto& source{operator[](src).texture};
-
-        if (target != source)
-            glDeleteTextures(1, &target);
-
-        target = source;
-    }
-
     void Pipeline::reset() {
         pipes.clear();
     }

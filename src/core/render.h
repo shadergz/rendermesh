@@ -21,7 +21,7 @@ namespace rendermesh::core {
         window::MainWindow& window;
         std::unique_ptr<mesh::Complex> mesh;
 
-        std::shared_ptr<buffer::Submit> submitter;
+        std::shared_ptr<buffer::Submit> buffers;
         view::Camera camera;
 
         std::shared_ptr<raster::Shaders> shader;

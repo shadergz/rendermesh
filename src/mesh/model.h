@@ -10,20 +10,33 @@
 #include <buffer/vertex.h>
 #include <buffer/texture.h>
 namespace rendermesh::mesh {
+    enum TransformLevel {
+        Global,
+        Local
+    };
+
+    struct NodeTransform {
+        explicit NodeTransform(u32 parent, u32 depth, const aiMatrix4x4& matrix = aiMatrix4x4());
+
+        glm::vec3 scale{};
+        glm::vec3 position{};
+        glm::quat rotation{};
+
+        u32 parent;
+        u32 depth;
+        TransformLevel domain{Global};
+    };
     struct Model {
-        Model() = default;
-        std::vector<buffer::Vertex> triangles;
-        std::vector<GLuint> indices;
+        explicit Model(const u32 in, const u32 pipe = 0) :
+            pipeline(pipe), level(in) {}
 
-        u32 pipeline;
-        std::vector<buffer::Texture> textures;
-        u64 identifier;
+        std::vector<buffer::Vertex> triangles{};
+        std::vector<GLuint> indices{};
 
-        glm::vec3 scale;
-        glm::vec3 position;
-        glm::quat rotation;
+        u32 pipeline{};
+        std::vector<buffer::Texture> textures{};
+        u64 identifier{};
 
-        u32 parent{};
-        u32 depth{};
+        u32 level;
     };
 }

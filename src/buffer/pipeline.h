@@ -24,7 +24,6 @@ namespace rendermesh::buffer {
             enbFiltering(anisotropic), amount(value) {}
 
         u32 generate();
-        void reuse(u32 dest, u32 src);
         void reset();
 
         MeshPipeline& operator[](u32 index);

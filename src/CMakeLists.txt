@@ -6,6 +6,7 @@ target_sources(rendermesh PRIVATE
     main.cpp
     mesh/complex.cpp
     mesh/complex.h
+    mesh/model.cpp
     mesh/model.h
     buffer/submit.cpp
     buffer/submit.h
@@ -19,6 +20,8 @@ target_sources(rendermesh PRIVATE
     window/main_window.h
     core/render.cpp
     core/render.h
+    core/filter.cpp
+    core/filter.h
     raster/shaders.cpp
     raster/shaders.h
     view/camera.cpp

@@ -21,10 +21,11 @@ namespace rendermesh::buffer {
             : buffers(pipeline), shader(shaders) {}
 
         void bindMeshModel(u32 model);
-        void bindBuffer(const std::vector<Vertex>& triangles, const std::vector<GLuint>& indices) const;
-        void drawBuffers(u64 meshHash, u32 indices);
+        void bindVertexObjects(const std::vector<Vertex>& triangles, const std::vector<GLuint>& indices) const;
+        void drawObjects(u64 meshHash, u32 indices);
 
         void loadTexture(u64 meshHash, const Texture& resource);
+        void reuseTexture(u32 dest, GLuint src) const;
         void mixTexture(u64 meshHash, const Texture& resource);
 
         void accMvp(const glm::mat4& point, bool isView = false);

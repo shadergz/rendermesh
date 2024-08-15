@@ -10,7 +10,13 @@ set(CMAKE_CXX_FLAGS_RELEASE -Ofast)
 set(SDL_EXAMPLES OFF)
 set(SDL_TEST_LIBRARY OFF)
 set(SDL_DISABLE_INSTALL ON)
-add_subdirectory(external/SDL EXCLUDE_FROM_ALL)
+
+find_package(SDL 2.30.6 OPTIONAL_COMPONENTS)
+find_package(OpenGL REQUIRED)
+
+if(NOT SDL2_FOUND)
+    add_subdirectory(external/SDL EXCLUDE_FROM_ALL)
+endif()
 add_subdirectory(external/SDL_image EXCLUDE_FROM_ALL)
 
 add_subdirectory(external/glm)
@@ -22,7 +28,6 @@ set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "")
 set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "")
 set(ASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT OFF)
 set(ASSIMP_BUILD_ALL_EXPORTERS_BY_DEFAULT OFF)
-set(ASSIMP_BUILD_OBJ_IMPORTER ON CACHE BOOL "")
 set(ASSIMP_BUILD_GLTF_IMPORTER ON CACHE BOOL "")
 add_subdirectory(external/assimp)
 
@@ -37,8 +42,8 @@ add_library(imgui STATIC
     ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
 )
 target_include_directories(imgui PUBLIC ${IMGUI_DIR})
-find_package(OpenGL REQUIRED)
 target_link_libraries(imgui PUBLIC GL SDL2::SDL2)
+target_compile_options(imgui PRIVATE -w)
 
 add_executable(rendermesh)
 add_subdirectory(src)

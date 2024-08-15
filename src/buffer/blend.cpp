@@ -29,9 +29,7 @@ namespace rendermesh::buffer {
         constexpr std::array<std::string_view, 3> uniforms{"diffuse", "specular", "emissive"};
         glActiveTexture(GL_TEXTURE0 + unit);
 
-        if (type == aiTextureType_DIFFUSE)
-
-            glBindTexture(GL_TEXTURE_2D, tex);
+        glBindTexture(GL_TEXTURE_2D, tex);
         glUniform1i(shader->getUniform(uniforms[unit]), unit);
     }
 

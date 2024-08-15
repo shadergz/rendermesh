@@ -6,7 +6,6 @@
 #define GL_GLEXT_PROTOTYPES
 #include <SDL2/SDL_opengl.h>
 
-#include <types.h>
 #include <raster/shaders.h>
 namespace rendermesh::raster {
 
