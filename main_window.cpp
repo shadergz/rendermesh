@@ -28,12 +28,23 @@ namespace rendermesh {
     u32 MainWindow::receiveEvents(bool& quit) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
+            if (event.type == SDL_QUIT ||
+                event.key.keysym.sym == SDLK_ESCAPE) {
                 quit = true;
             }
             if (event.type == SDL_KEYDOWN)
                 if (event.key.keysym.sym == SDL_SCANCODE_ESCAPE)
                     quit = true;
+
+            if (event.key.keysym.sym == SDLK_e)
+                enbVerticesView(event.type);
+
+            if (SDL_MOUSEMOTION == event.type && SDL_BUTTON_LEFT == event.button.button) {
+                i32 x, y;
+                SDL_GetMouseState(&x, &y);
+                look(static_cast<f32>(x), static_cast<f32>(y));
+            }
+            walk(event.key.keysym);
         }
         if (quit)
             running = {};

@@ -1,11 +1,13 @@
 #pragma once
 
+#include <filesystem>
+
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/gtx/hash.hpp>
 
 #include <types.h>
-#include <filesystem>
+#include <shaders.h>
 namespace rendermesh {
     enum BoundsLayout {
         PositionVBO,
@@ -29,27 +31,22 @@ namespace rendermesh {
         }
     };
 
-    class MeshesBuffer {
+    class MeshBuffer {
     public:
         const u32 positionsAttr{0};
         const u32 normalsAttr{1};
         const u32 texturesAttr{2};
 
-        MeshesBuffer() = default;
-        ~MeshesBuffer();
-
-        void bind() const;
-        void createVAO();
+        explicit MeshBuffer(std::array<GLuint, 2>& glBuffers)
+            : vbos(glBuffers) {
+        }
+        void drawBuffers(u32 indices) const;
 
         void bindBuffer(const std::vector<Vertex>& triangles, const std::vector<GLuint>& indices) const;
-
         void loadTexture(const std::filesystem::path& path);
-        void draw(GLsizei indices) const;
-
     private:
         GLuint texture{};
 
-        GLuint vao{};
-        std::array<GLuint, EBO + 1> vbos{};
+        std::array<GLuint, 2>& vbos;
     };
 }

@@ -17,11 +17,12 @@ namespace rendermesh {
         "layout (location = 2) in vec2 texture;\n"
         "\n"
         "\n"
+        "uniform mat4 mvp;\n"
         "out vec3 colors;\n"
         "out vec2 TexCoord;\n"
         "void main()\n"
         "{\n"
-        "   gl_Position = vec4(position, 1.f);\n"
+        "   gl_Position = mvp * vec4(position, 1.f);\n"
         "   colors = normal;\n"
         "   TexCoord = texture;\n"
         "}\n"
@@ -35,7 +36,7 @@ namespace rendermesh {
         "uniform sampler2D tex;\n"
         "void main()\n"
         "{\n"
-        "   FragColor = texture(tex, TexCoord) * vec4(colors, 1.f);\n"
+        "   FragColor = texture(tex, TexCoord);\n"
         "}\n"
     };
 
@@ -56,6 +57,8 @@ namespace rendermesh {
     }
 
     Shaders::~Shaders() {
+        glDetachShader(program, vertexShader);
+        glDetachShader(program, fragmentShader);
         if (glIsProgram(program))
             glDeleteProgram(program);
         glDeleteShader(vertexShader);
@@ -67,6 +70,10 @@ namespace rendermesh {
             throw std::runtime_error("");
         }
         glUseProgram(program);
+    }
+
+    GLuint Shaders::getMvpVar() const {
+        return glGetUniformLocation(program, "mvp");
     }
 
     void Shaders::compileShader(const u32& shader, const std::string& source) {

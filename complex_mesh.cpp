@@ -7,9 +7,8 @@
 #include <complex_mesh.h>
 #include <types.h>
 namespace rendermesh {
-    ComplexMesh::ComplexMesh(Shaders& shader,
-            const std::filesystem::path& path) : attach(shader) {
-        meshes.createVAO();
+    ComplexMesh::ComplexMesh(std::shared_ptr<MeshBuffer>& buffer, const std::filesystem::path& path) :
+        meshBuffer(buffer) {
 
         std::fstream model(path);
         if (!model.is_open()) {
@@ -34,39 +33,37 @@ namespace rendermesh {
             texName = materials[textured].diffuse_texname;
         if (!texName.empty())
             texture = std::make_pair(texName, mtlDir);
-        auto objTextured{path};
+        auto imagePath{path};
 
-        objTextured.replace_extension("jpg");
+        imagePath.replace_extension("jpg");
 
-        if (exists(objTextured))
-            texture = std::make_pair(objTextured.string(), std::filesystem::path{});
+        if (exists(imagePath))
+            texture = std::make_pair(imagePath.string(), std::filesystem::path{});
 
-        objTextured.replace_extension("png");
-        if (exists(objTextured))
-            texture = std::make_pair(objTextured.string(), std::filesystem::path{});
+        imagePath.replace_extension("png");
+        if (exists(imagePath))
+            texture = std::make_pair(imagePath.string(), std::filesystem::path{});
     }
-    void ComplexMesh::populateBuffers() {
-        meshes.bind();
-        meshes.loadTexture({std::get<1>(texture) / std::get<0>(texture)});
+    void ComplexMesh::populateBuffers() const {
+        meshBuffer->loadTexture({std::get<1>(texture) / std::get<0>(texture)});
 
-        meshes.bindBuffer(triangles, indices);
+        meshBuffer->bindBuffer(triangles, indices);
     }
+
     void ComplexMesh::draw() const {
-        attach.useShaders();
-        meshes.draw(indices.size());
+        meshBuffer->drawBuffers(indices.size());
     }
 
-    void ComplexMesh::loadAllVertices(const std::vector<tinyobj::shape_t>& shapes, const std::vector<float>& vertices,
-        const std::vector<float>& normals, const std::vector<float>& texcoords) {
+    void ComplexMesh::loadAllVertices(const std::vector<tinyobj::shape_t>& shapes, const std::vector<f32>& vertices,
+        const std::vector<f32>& normals, const std::vector<f32>& texcoords) {
 
         std::unordered_map<Vertex, u32, HashVertex> uniqueVertices;
         const auto& model{shapes[0]};
         const auto& mesh{model.mesh};
         textured = mesh.material_ids[0];
 
-        for (u64 index{}; index < mesh.indices.size(); index++) {
+        for (const auto& realMap : mesh.indices) {
             Vertex piramide{};
-            const auto& realMap{mesh.indices[index]};
             piramide.position = {
                 vertices[3 * realMap.vertex_index + 0],
                 vertices[3 * realMap.vertex_index + 1],
@@ -79,21 +76,18 @@ namespace rendermesh {
                     normals[3 * realMap.normal_index + 2],
                 };
             }
-
-            piramide.texture = {};
-
             if (!texcoords.empty()) {
-                const auto textCoord0{texcoords[3 * realMap.texcoord_index + 0]};
-                const auto textCoord1{texcoords[3 * realMap.texcoord_index + 1]};
-                if (textCoord0 >= 0 && textCoord1 >= 0) {
+                const auto texCoordX{texcoords[2 * realMap.texcoord_index + 0]};
+                const auto texCoordY{texcoords[2 * realMap.texcoord_index + 1]};
+                if (texCoordX >= 0 && texCoordY >= 0) {
                     piramide.texture = {
-                        textCoord0, textCoord1
+                        texCoordX, 1.f - texCoordY
                     };
                 }
             }
 
             if (!uniqueVertices.contains(piramide)) {
-                uniqueVertices[piramide] = triangles.size();
+                uniqueVertices[piramide] = static_cast<u32>(triangles.size());
                 triangles.push_back(piramide);
             }
             indices.push_back(uniqueVertices[piramide]);

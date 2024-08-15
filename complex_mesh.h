@@ -4,26 +4,25 @@
 #define GL_GLEXT_PROTOTYPES
 #include <SDL2/SDL_opengl.h>
 
-#include <meshes_buffer.h>
-#include <shaders.h>
+#include <mesh_buffer.h>
+#include <camera.h>
 namespace rendermesh {
 
     class ComplexMesh {
     public:
-        explicit ComplexMesh(Shaders& shader, const std::filesystem::path& path);
+        explicit ComplexMesh(std::shared_ptr<MeshBuffer>& buffer, const std::filesystem::path& path);
 
-        void populateBuffers();
+        void populateBuffers() const;
         void draw() const;
     private:
-        Shaders& attach;
-        MeshesBuffer meshes{};
+        std::shared_ptr<MeshBuffer> meshBuffer;
 
         std::vector<Vertex> triangles{};
         std::vector<GLuint> indices{};
 
         std::vector<tinyobj::shape_t> shapes{};
         std::vector<tinyobj::material_t> materials{};
-        void loadAllVertices(const std::vector<tinyobj::shape_t>& shapes, const std::vector<float>& vertices, const std::vector<float>& normals, const std::vector<float>& texcoords);
+        void loadAllVertices(const std::vector<tinyobj::shape_t>& shapes, const std::vector<f32>& vertices, const std::vector<f32>& normals, const std::vector<f32>& texcoords);
 
         u64 textured{std::numeric_limits<u64>::max()};
         std::pair<std::string, std::filesystem::path> texture;

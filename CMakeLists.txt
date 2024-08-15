@@ -17,14 +17,16 @@ target_sources(rendermesh PRIVATE
     main.cpp
     complex_mesh.cpp
     complex_mesh.h
-    meshes_buffer.cpp
-    meshes_buffer.h
+    mesh_buffer.cpp
+    mesh_buffer.h
     main_window.cpp
     main_window.h
     render.cpp
     render.h
     shaders.cpp
     shaders.h
+    camera.cpp
+    camera.h
     types.h
 )
 
