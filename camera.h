@@ -12,6 +12,8 @@ namespace rendermesh {
         glm::mat4 getViewMatrix();
         void walkAround(const SDL_Keysym& board);
         void lookAround(f32 x, f32 y);
+
+        void setCameraSpeed(f32 value);
     private:
         glm::vec3 cameraPos{0.0f, 0.0f,  3.0f};
         glm::vec3 cameraFront{0.0f, 0.0f, -1.0f};
@@ -22,5 +24,7 @@ namespace rendermesh {
 
         f32 lastX{}, lastY{};
         f32 yaw{}, pitch{};
+
+        f32 cameraSpeed{};
     };
 }

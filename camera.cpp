@@ -18,7 +18,6 @@ namespace rendermesh {
     }
 
     void Camera::walkAround(const SDL_Keysym& board) {
-        constexpr auto cameraSpeed{.05f};
         if (board.sym == SDLK_w)
             cameraPos += cameraSpeed * cameraFront;
         if (board.sym == SDLK_s)
@@ -60,5 +59,9 @@ namespace rendermesh {
             sin(glm::radians(yaw)) * cos(glm::radians(pitch)),
         };
         cameraFront = normalize(direction);
+    }
+
+    void Camera::setCameraSpeed(const f32 value) {
+        cameraSpeed = value;
     }
 }

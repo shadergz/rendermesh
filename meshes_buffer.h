@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <list>
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
@@ -9,10 +10,6 @@
 #include <types.h>
 #include <shaders.h>
 namespace rendermesh {
-    enum BoundsLayout {
-        PositionVBO,
-        EBO
-    };
     struct Vertex {
         Vertex() = default;
         glm::vec3 position;
@@ -31,22 +28,38 @@ namespace rendermesh {
         }
     };
 
-    class MeshBuffer {
+    struct MeshPipelineBuffers {
+        MeshPipelineBuffers() {
+
+        }
+        GLuint texture{};
+        GLuint ebo{};
+        GLuint vbo{};
+    };
+
+    class MeshesBuffer {
     public:
         const u32 positionsAttr{0};
         const u32 normalsAttr{1};
         const u32 texturesAttr{2};
 
-        explicit MeshBuffer(std::array<GLuint, 2>& glBuffers)
-            : vbos(glBuffers) {
+        explicit MeshesBuffer(std::list<MeshPipelineBuffers>& glBuffers)
+            : pipelines(glBuffers) {
         }
+        auto size() const {
+            return pipelines.size();
+        }
+
         void drawBuffers(u32 indices) const;
+        void bindMeshModel(u32 model);
 
         void bindBuffer(const std::vector<Vertex>& triangles, const std::vector<GLuint>& indices) const;
-        void loadTexture(const std::filesystem::path& path);
+        void loadTexture(const std::filesystem::path& path) const;
     private:
-        GLuint texture{};
+        std::list<MeshPipelineBuffers>& pipelines;
 
-        std::array<GLuint, 2>& vbos;
+        GLuint texture{};
+        GLuint ebo{};
+        GLuint vbo{};
     };
 }

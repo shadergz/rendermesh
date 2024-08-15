@@ -2,12 +2,12 @@
 #include <SDL2/SDL_opengl.h>
 #include <SDL_image.h>
 
-#include <mesh_buffer.h>
+#include <meshes_buffer.h>
 namespace rendermesh {
-    void MeshBuffer::bindBuffer(const std::vector<Vertex>& triangles, const std::vector<GLuint>& indices) const {
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbos[EBO]);
+    void MeshesBuffer::bindBuffer(const std::vector<Vertex>& triangles, const std::vector<GLuint>& indices) const {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices[0]) * indices.size(), &indices[0], GL_STATIC_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, vbos[PositionVBO]);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
         glBufferData(GL_ARRAY_BUFFER, sizeof(triangles[0]) * triangles.size(), &triangles[0], GL_STATIC_DRAW);
 
         // We are using the AOS memory model
@@ -26,21 +26,18 @@ namespace rendermesh {
         glBindVertexArray(0);
     }
 
-    void MeshBuffer::drawBuffers(const u32 indices) const {
+    void MeshesBuffer::drawBuffers(const u32 indices) const {
         // Binds the texture to our object in the fragment shader 'tex'
         glBindTexture(GL_TEXTURE_2D, texture);
 
         glDrawElements(GL_TRIANGLES, indices, GL_UNSIGNED_INT, nullptr);
     }
 
-    void MeshBuffer::loadTexture(const std::filesystem::path& path) {
-        glGenTextures(1, &texture);
+    void MeshesBuffer::loadTexture(const std::filesystem::path& path) const {
         glBindTexture(GL_TEXTURE_2D, texture);
 
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
         const auto source{IMG_Load(path.c_str())};
         SDL_Rect imageFrame{0, 0, source->w, source->h};
@@ -72,5 +69,14 @@ namespace rendermesh {
             glGenerateMipmap(GL_TEXTURE_2D);
         }
         SDL_FreeSurface(target);
+    }
+
+    void MeshesBuffer::bindMeshModel(const u32 model) {
+        auto position{std::begin(pipelines)};
+        std::advance(position, model);
+
+        texture = position->texture;
+        ebo = position->ebo;
+        vbo = position->vbo;
     }
 }

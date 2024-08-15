@@ -1,22 +1,34 @@
 #include <string>
 #define GL_GLEXT_PROTOTYPES
-#include <SDL_opengl.h>
-#include <render.h>
+#include <SDL2/SDL_opengl.h>
+#include <imgui.h>
 
+#include <backends/imgui_impl_opengl3.h>
+#include <backends/imgui_impl_sdl2.h>
+
+#include <render.h>
 namespace rendermesh {
+    constexpr auto maxOfLoadableModel{1};
     Render::Render(MainWindow& main) :
         window(main) {
 
         glGenVertexArrays(1, &vao);
         glBindVertexArray(vao);
-        glGenBuffers(2, &vbos[0]);
+        buffers.resize(maxOfLoadableModel);
+
+        for (auto& modelBuffers : buffers) {
+            glGenBuffers(1, &modelBuffers.ebo);
+            glGenBuffers(1, &modelBuffers.vbo);
+
+            glGenTextures(1, &modelBuffers.texture);
+        }
 
         i32 h, w;
         SDL_GetWindowSize(window.main, &w, &h);
 
         shader = std::make_unique<Shaders>();
         mvp = shader->getMvpVar();
-        buffer = std::make_shared<MeshBuffer>(vbos);
+        buffer = std::make_shared<MeshesBuffer>(buffers);
         camera = Camera(static_cast<f32>(h), static_cast<f32>(w));
     }
 
@@ -45,18 +57,63 @@ namespace rendermesh {
                 isEnb = true;
             }
         };
+        using FasterClock = std::chrono::time_point<std::chrono::high_resolution_clock>;
+        using DiffTicks = std::chrono::duration<f32>;
+        using GetTicks = std::chrono::high_resolution_clock;
+
+        FasterClock beginTime{};
+        FasterClock endTime{};
+        f32 deltaTime{};
+
+        std::array<f32, 200> framesSamples{};
+        u32 sample{};
+        std::array bgColor{0.f, 0.f, 0.125f, 1.f};
+        f32 cs{0.05f};
 
         while (!quit) {
+            beginTime = GetTicks::now();
+            camera.setCameraSpeed(cs);
             window.receiveEvents(quit);
 
-            glClearColor(0.f, 0.f, 0.f, 1);
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplSDL2_NewFrame();
+            ImGui::NewFrame();
+
+            glClearColor(bgColor[0], bgColor[1], bgColor[2], bgColor[3]);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            const auto view{camera.getViewMatrix() * transformMesh()};
+            bool isActivate{};
+            ImGui::Begin("Scene", &isActivate, ImGuiWindowFlags_MenuBar);
+            if (ImGui::BeginMenuBar()) {
+                if (ImGui::BeginMenu("File")) {
+                    ImGui::EndMenu();
+                }
+                ImGui::EndMenuBar();
+            }
+            const auto fps{deltaTime * 1000.f};
+            if (sample > sizeof(framesSamples) / sizeof(f32))
+                sample = 0;
+
+            ImGui::ColorEdit4("Background", &bgColor[0]);
+            ImGui::SliderFloat("Camera Speed", &cs, 0.1f, 1.f);
+
+            framesSamples[sample++] = fps;
+            ImGui::PlotLines("Framerate", &framesSamples[0], framesSamples.size());
+
+            ImGui::Text("FPS: %f", fps);
+            ImGui::End();
+
+            const auto view{camera.getViewMatrix()};
             draw(view);
 
+            ImGui::Render();
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
             glFlush();
+            endTime = GetTicks::now();
             SDL_GL_SwapWindow(window.main);
+
+            deltaTime = DiffTicks(endTime - beginTime).count();
         }
     }
 
@@ -72,7 +129,7 @@ namespace rendermesh {
         if (!exists(meshFile)) {
 
         }
-        mesh = std::make_unique<ComplexMesh>(buffer, meshFile);
+        mesh = std::make_unique<ComplexModel>(buffer, meshFile);
         mesh->populateBuffers();
     }
     void Render::draw(const glm::mat4& view) const {

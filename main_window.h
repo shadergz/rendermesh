@@ -4,8 +4,8 @@
 
 #include <types.h>
 namespace rendermesh {
-    constexpr auto width{600};
-    constexpr auto height{600};
+    constexpr auto width{700};
+    constexpr auto height{700};
 
     class MainWindow {
     public:

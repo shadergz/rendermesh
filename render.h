@@ -1,8 +1,8 @@
 #pragma once
-#include <vector>
+#include <list>
 
 #include <main_window.h>
-#include <complex_mesh.h>
+#include <complex_model.h>
 #include <camera.h>
 
 namespace rendermesh {
@@ -16,15 +16,15 @@ namespace rendermesh {
 
         static glm::mat4 transformMesh();
         MainWindow& window;
-        std::unique_ptr<ComplexMesh> mesh;
+        std::unique_ptr<ComplexModel> mesh;
 
-        std::shared_ptr<MeshBuffer> buffer;
+        std::shared_ptr<MeshesBuffer> buffer;
         Camera camera;
 
         std::unique_ptr<Shaders> shader;
 
         GLuint mvp{};
         GLuint vao{};
-        std::array<GLuint, EBO + 1> vbos{};
+        std::list<MeshPipelineBuffers> buffers;
     };
 }
