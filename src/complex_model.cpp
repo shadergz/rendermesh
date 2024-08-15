@@ -1,5 +1,4 @@
 // ReSharper disable CppDFANullDereference
-#include <fstream>
 #include <iostream>
 #include <print>
 
@@ -9,8 +8,6 @@
 namespace rendermesh {
     ComplexModel::ComplexModel(std::shared_ptr<MeshesBuffer>& buffer, const std::filesystem::path& path) :
         meshesBuffer(buffer) {
-
-        meshes.resize(meshesBuffer->size());
 
         std::fstream model(path);
         if (!model.is_open()) {
@@ -27,22 +24,17 @@ namespace rendermesh {
             std::terminate();
         }
 
-        u32 shapeIndex{};
-
-        for (auto& modelMesh : meshes) {
-            if (shapes.size() <= shapeIndex)
-                continue;
-
-            auto& currShape{shapes[shapeIndex]};
-            modelMesh.pipeline = shapeIndex++;
+        MeshModel mesh{};
+        for (const auto& shape : shapes) {
+            mesh.pipeline = graphics++;
 
             std::string texName;
-            buildTriangles(currShape, modelMesh, attributes.vertices, attributes.normals, attributes.texcoords);
+            buildTriangles(shape, mesh, attributes.vertices, attributes.normals, attributes.texcoords);
 
-            if (modelMesh.textured < materials.size()) {
-                texName = materials[modelMesh.textured].diffuse_texname;
+            if (mesh.textured < materials.size()) {
+                texName = materials[mesh.textured].diffuse_texname;
                 if (texName.empty())
-                    texName = materials[modelMesh.textured].bump_texname;
+                    texName = materials[mesh.textured].bump_texname;
 
                 while (texName.find('\\') != std::string::npos) {
                     auto begin{texName.find('\\')};
@@ -55,41 +47,30 @@ namespace rendermesh {
                 }
             }
 
-            getTextureName(modelMesh.texture, path, texName);
-            modelMesh.isEnb = true;
+            getTexturePath(mesh.texture, path, texName);
+            meshes.emplace_back(std::move(mesh));
         }
     }
     void ComplexModel::populateBuffers() const {
-        std::for_each(meshes.begin(), meshes.end(), [&](const auto& mesh) {
-            if (!mesh.isEnb)
-                return false;
-
+        for (const auto& mesh : meshes) {
             meshesBuffer->bindMeshModel(mesh.pipeline);
 
-            meshesBuffer->loadTexture({std::get<1>(mesh.texture) / std::get<0>(mesh.texture)});
+            meshesBuffer->loadTexture(mesh.texture);
             meshesBuffer->bindBuffer(mesh.triangles, mesh.indices);
-            return true;
-        });
+        }
     }
 
     void ComplexModel::draw() const {
-        std::for_each(meshes.begin(), meshes.end(), [&](auto& mesh) {
-            if (!mesh.isEnb)
-                return false;
-
+        for (const auto& mesh : meshes) {
             meshesBuffer->bindMeshModel(mesh.pipeline);
             meshesBuffer->drawBuffers(mesh.indices.size());
-            return true;
-        });
+        }
     }
 
-    void ComplexModel::buildTriangles(
-        const tinyobj::shape_t& shape,
-        MeshModel& modelMesh,
+    void ComplexModel::buildTriangles(const tinyobj::shape_t& shape, MeshModel& modelMesh,
         const std::vector<f32>& vertices,
         const std::vector<f32>& normals, const std::vector<f32>& texcoords) {
 
-        std::unordered_map<Vertex, u32, HashVertex> uniqueVertices;
         const auto& mesh{shape.mesh};
         auto& triangles{modelMesh.triangles};
         auto& indices{modelMesh.indices};
@@ -97,14 +78,14 @@ namespace rendermesh {
         modelMesh.textured = mesh.material_ids[0];
 
         for (const auto& realMap : mesh.indices) {
-            Vertex piramide{};
-            piramide.position = {
+            Vertex vertex{};
+            vertex.position = {
                 vertices[3 * realMap.vertex_index + 0],
                 vertices[3 * realMap.vertex_index + 1],
                 vertices[3 * realMap.vertex_index + 2],
             };
             if (!normals.empty()) {
-                piramide.normal = {
+                vertex.normal = {
                     normals[3 * realMap.normal_index + 0],
                     normals[3 * realMap.normal_index + 1],
                     normals[3 * realMap.normal_index + 2],
@@ -114,41 +95,39 @@ namespace rendermesh {
                 const auto texCoordX{texcoords[2 * realMap.texcoord_index + 0]};
                 const auto texCoordY{texcoords[2 * realMap.texcoord_index + 1]};
                 if (texCoordX >= 0 && texCoordY >= 0) {
-                    piramide.texture = {
+                    vertex.texture = {
                         texCoordX, 1.f - texCoordY
                     };
                 }
             }
 
-            if (!uniqueVertices.contains(piramide)) {
-                uniqueVertices[piramide] = static_cast<u32>(triangles.size());
-                triangles.push_back(piramide);
+            if (!uniqueVertices.contains(vertex)) {
+                uniqueVertices[vertex] = static_cast<u32>(triangles.size());
+                triangles.push_back(vertex);
             }
-            indices.push_back(uniqueVertices[piramide]);
+            indices.push_back(uniqueVertices[vertex]);
         }
         std::print("Total triangles obtained: {}\n", triangles.size());
         std::print("Total indices obtained: {}\n", indices.size());
     }
 
-    void ComplexModel::getTextureName(
-        std::pair<std::string, std::filesystem::path>& text,
-        const std::filesystem::path& path,
-        std::string& name) {
+    void ComplexModel::getTexturePath(std::filesystem::path& output,
+        const std::filesystem::path& model, const std::filesystem::path& tex) const {
 
-        auto imagePath{path};
+        auto imagePath{model};
 
-        if (name.empty()) {
+        if (!tex.has_filename()) {
             imagePath.replace_extension("jpg");
             if (exists(imagePath))
-                text = std::make_pair(imagePath.string(), std::filesystem::path{});
+                output = imagePath;
             imagePath.replace_extension("png");
             if (exists(imagePath))
-                text = std::make_pair(imagePath.string(), std::filesystem::path{});
+                output = imagePath;
         } else {
-            text = std::make_pair(name, mtlDir);
+            output = mtlDir / tex;
         }
-        if (std::get<0>(text).empty()) {
+        std::print("Texture path {}\n", output.string());
+        if (!exists(output) && !is_regular_file(output))
             throw std::runtime_error("No texture was loaded for the object, check the import locations");
-        }
     }
 }

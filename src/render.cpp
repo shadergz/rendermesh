@@ -1,8 +1,11 @@
 #include <string>
 #include <chrono>
+#include <print>
+
 #define GL_GLEXT_PROTOTYPES
 #include <SDL2/SDL_opengl.h>
 #include <imgui.h>
+#include <ImGuiFileDialog.h>
 
 #include <backends/imgui_impl_opengl3.h>
 #include <backends/imgui_impl_sdl2.h>
@@ -58,20 +61,8 @@ namespace rendermesh {
                 isEnb = true;
             }
         };
-        using FasterClock = std::chrono::time_point<std::chrono::high_resolution_clock>;
-        using GetTicks = std::chrono::high_resolution_clock;
 
-        FasterClock beginTime{};
-        FasterClock endTime{};
-        f32 deltaTime{};
-        f32 acc{};
-        f32 fps{};
-        f32 frames{};
-
-        std::array<f32, 200> framesSamples{};
-        u32 sample{};
-        std::array bgColor{0.f, 0.f, 0.125f, 1.f};
-        f32 cs{0.05f};
+        SDL_ShowWindow(window.main);
 
         while (!quit) {
             beginTime = GetTicks::now();
@@ -85,31 +76,7 @@ namespace rendermesh {
             glClearColor(bgColor[0], bgColor[1], bgColor[2], bgColor[3]);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            bool isActivate{};
-            ImGui::Begin("Scene", &isActivate, ImGuiWindowFlags_MenuBar);
-            if (ImGui::BeginMenuBar()) {
-                if (ImGui::BeginMenu("File")) {
-                    ImGui::EndMenu();
-                }
-                ImGui::EndMenuBar();
-            }
-
-            acc += deltaTime;
-            if (acc > 1000.f) {
-                fps = frames;
-                frames = acc = {};
-            }
-            if (sample > sizeof(framesSamples) / sizeof(f32))
-                sample = 0;
-
-            ImGui::ColorEdit4("Background", &bgColor[0]);
-            ImGui::SliderFloat("Camera Speed", &cs, 0.1f, 1.f);
-
-            framesSamples[sample++] = fps;
-            ImGui::PlotLines("Framerate", &framesSamples[0], framesSamples.size());
-
-            ImGui::Text("FPS: %f", fps);
-            ImGui::End();
+            drawUi();
 
             const auto view{camera.getViewMatrix()};
             draw(view);
@@ -128,20 +95,97 @@ namespace rendermesh {
     }
 
     void Render::initialize(const std::vector<char*>& args) {
-        std::string objectPath{};
         for (const auto argument : args) {
-            if (std::string(".obj") == std::filesystem::path(argument).extension())
-                objectPath = argument;
-        }
-        if (objectPath.empty())
-            std::terminate();
-        const std::filesystem::path meshFile(objectPath);
-        if (!exists(meshFile)) {
+            if (std::string(".obj") == std::filesystem::path(argument).extension()) {
+                const auto file{std::filesystem::canonical(argument)};
+                if (std::ranges::find(files, file) != files.end())
+                    throw std::runtime_error("Already exists");
 
+                files.emplace_back(file);
+            }
         }
-        mesh = std::make_unique<ComplexModel>(buffer, meshFile);
-        mesh->populateBuffers();
+        for (const auto& file : files) {
+            if (!exists(file))
+                throw std::runtime_error("File does not exist");
+        }
+
+        if (files.size())
+            open(files.back());
     }
+
+    void Render::open(const std::filesystem::path& path) {
+        auto droppedMesh{std::make_unique<ComplexModel>(buffer, path)};
+        mesh.swap(droppedMesh);
+        mesh->populateBuffers();
+
+        selected = path;
+    }
+
+    void Render::drawUi() {
+        bool isActivate{};
+        ImGui::Begin("Scene", &isActivate, ImGuiWindowFlags_MenuBar);
+        const auto fileDialog{ImGuiFileDialog::Instance()};
+        if (ImGui::BeginMenuBar()) {
+            if (ImGui::BeginMenu("File")) {
+                if (ImGui::MenuItem("Open", "Ctrl+O")) {
+                    const IGFD::FileDialogConfig config{.path = "."};
+                    fileDialog->OpenDialog("ChooseFileDlgKey", "Choose File", ".obj", config);
+                }
+                ImGui::EndMenu();
+            }
+            ImGui::EndMenuBar();
+        }
+        if (fileDialog->Display("ChooseFileDlgKey")) {
+            if (ImGuiFileDialog::Instance()->IsOk()) {
+                const std::filesystem::path path{fileDialog->GetFilePathName()};
+                const auto contains{std::ranges::find(files, path)};
+                if (contains == files.end())
+                    files.emplace_back(path);
+            }
+
+            fileDialog->Close();
+        }
+
+        acc += deltaTime;
+        if (acc > 1000.f) {
+            fps = frames;
+            frames = acc = {};
+        }
+        if (sample > sizeof(framesSamples) / sizeof(f32))
+            sample = 0;
+
+        ImGui::ColorEdit4("Background", &bgColor[0]);
+        ImGui::SliderFloat("Camera Speed", &cs, 0.1f, 1.f);
+
+        framesSamples[sample++] = fps;
+        ImGui::PlotLines("Framerate", &framesSamples[0], framesSamples.size());
+
+        ImGui::Text("FPS: %f", fps);
+
+        ImGui::BeginTable("Recent Objects", 1);
+        ImGui::TableSetupColumn("Recent Objects");
+
+        ImGui::TableHeadersRow();
+        for (u32 index{}; index < files.size(); index++) {
+            ImGui::Text(files[index].c_str());
+
+            if (files[index] == selected)
+                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0 + index, ImGui::GetColorU32(ImVec4(0.7f, 0.3f, 0.3f, 0.65f)));
+
+            if (ImGui::IsItemClicked()) {
+                if (selected != files[index]) {
+                    std::print("Selected: {}\n", files[index].string());
+                    open(files[index]);
+                }
+            }
+            ImGui::TableNextColumn();
+        }
+
+        ImGui::EndTable();
+
+        ImGui::End();
+    }
+
     void Render::draw(const glm::mat4& view) const {
         // All the drawing work is done here
         glBindVertexArray(vao);

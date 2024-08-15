@@ -30,23 +30,21 @@ namespace rendermesh {
 
     void Camera::lookAround(const f32 x, const f32 y) {
         static auto initMouse{true};
+        const glm::vec2 mouse{x, y};
         if (initMouse) {
-            lastX = x;
-            lastY = y;
+            oldMouse = mouse;
             initMouse = {};
         }
 
-        auto xoffset{x - lastX};
-        auto yoffset{lastY - y};
-        lastX = x;
-        lastY = y;
+        glm::vec2 mouseDelta{oldMouse - mouse};
+        mouseDelta.y = oldMouse.y - mouse.y;
+        oldMouse = mouse;
 
-        constexpr auto sensitivity{0.1f};
-        xoffset *= sensitivity;
-        yoffset *= sensitivity;
+        constexpr auto sensitivity{0.305f};
+        mouseDelta *= sensitivity;
 
-        yaw += xoffset;
-        pitch += yoffset;
+        yaw += mouseDelta.x;
+        pitch += mouseDelta.y;
 
         if (pitch > 89.0f)
             pitch = 89.0f;

@@ -63,6 +63,8 @@ namespace rendermesh {
             glDeleteProgram(program);
         glDeleteShader(vertexShader);
         glDeleteShader(fragmentShader);
+
+        program = vertexShader = fragmentShader = {};
     }
 
     void Shaders::useShaders() const {

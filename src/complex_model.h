@@ -16,8 +16,7 @@ namespace rendermesh {
         u32 pipeline;
         u64 textured{std::numeric_limits<u64>::max()};
 
-        std::pair<std::string, std::filesystem::path> texture;
-        bool isEnb{};
+        std::filesystem::path texture;
     };
 
     class ComplexModel {
@@ -33,14 +32,14 @@ namespace rendermesh {
         std::vector<tinyobj::shape_t> shapes{};
         std::vector<tinyobj::material_t> materials{};
 
-        static void buildTriangles(const tinyobj::shape_t& shape, MeshModel& modelMesh,
-            const std::vector<f32>& vertices,
-            const std::vector<f32>& normals,
-            const std::vector<f32>& texcoords);
+        void buildTriangles(const tinyobj::shape_t& shape, MeshModel& modelMesh,
+            const std::vector<f32>& vertices, const std::vector<f32>& normals, const std::vector<f32>& texcoords);
 
-        void getTextureName(std::pair<std::string, std::filesystem::path>& text,
-            const std::filesystem::path& path, std::string& name);
+        void getTexturePath(std::filesystem::path& output,
+            const std::filesystem::path& model, const std::filesystem::path& tex) const;
 
+        u32 graphics{};
         std::filesystem::path mtlDir{"./"};
+        std::unordered_map<Vertex, u32, HashVertex> uniqueVertices;
     };
 }

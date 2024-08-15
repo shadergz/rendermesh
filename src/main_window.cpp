@@ -24,7 +24,7 @@ namespace rendermesh {
     }
 
     void MainWindow::create() {
-        constexpr u32 windowFlags{SDL_WINDOW_OPENGL};
+        constexpr u32 windowFlags{SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN};
         if (SDL_Init(SDL_INIT_VIDEO) != 0) {
             throw std::runtime_error("SDL Failed: " + std::string(SDL_GetError()));
         }

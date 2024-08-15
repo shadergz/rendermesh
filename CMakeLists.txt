@@ -11,6 +11,7 @@ add_subdirectory(external/SDL_image EXCLUDE_FROM_ALL)
 
 add_subdirectory(external/tinyobjloader)
 add_subdirectory(external/glm)
+add_subdirectory(external/ImGuiFileDialog)
 find_package(OpenGL REQUIRED)
 
 add_executable(rendermesh)
@@ -29,4 +30,5 @@ add_library(imgui STATIC
 target_include_directories(imgui PUBLIC ${IMGUI_DIR})
 target_link_libraries(imgui PUBLIC GL SDL2::SDL2)
 
-target_link_libraries(rendermesh PRIVATE SDL2_image::SDL2_image tinyobjloader glm imgui)
+target_link_libraries(ImGuiFileDialog PUBLIC imgui)
+target_link_libraries(rendermesh PRIVATE SDL2_image::SDL2_image tinyobjloader glm ImGuiFileDialog)

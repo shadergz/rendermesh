@@ -22,7 +22,7 @@ namespace rendermesh {
         glm::mat4 projection{};
         glm::mat4 view{};
 
-        f32 lastX{}, lastY{};
+        glm::vec2 oldMouse{};
         f32 yaw{}, pitch{};
 
         f32 cameraSpeed{};

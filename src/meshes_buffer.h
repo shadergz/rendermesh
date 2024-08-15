@@ -54,7 +54,8 @@ namespace rendermesh {
         void bindMeshModel(u32 model);
 
         void bindBuffer(const std::vector<Vertex>& triangles, const std::vector<GLuint>& indices) const;
-        void loadTexture(const std::filesystem::path& path) const;
+
+        void loadTexture(const std::filesystem::path& path);
     private:
         std::list<MeshPipelineBuffers>& pipelines;
 

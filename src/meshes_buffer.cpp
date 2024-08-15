@@ -5,9 +5,7 @@
 #include <meshes_buffer.h>
 namespace rendermesh {
     void MeshesBuffer::bindBuffer(const std::vector<Vertex>& triangles, const std::vector<GLuint>& indices) const {
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices[0]) * indices.size(), &indices[0], GL_STATIC_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
         glBufferData(GL_ARRAY_BUFFER, sizeof(triangles[0]) * triangles.size(), &triangles[0], GL_STATIC_DRAW);
 
         // We are using the AOS memory model
@@ -22,22 +20,18 @@ namespace rendermesh {
         // ReSharper disable once CppRedundantCastExpression
         glVertexAttribPointer(texturesAttr, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, texture)));
         glEnableVertexAttribArray(texturesAttr);
-
-        glBindVertexArray(0);
     }
 
     void MeshesBuffer::drawBuffers(const u32 indices) const {
         // Binds the texture to our object in the fragment shader 'tex'
         glBindTexture(GL_TEXTURE_2D, texture);
-
         glDrawElements(GL_TRIANGLES, indices, GL_UNSIGNED_INT, nullptr);
     }
 
-    void MeshesBuffer::loadTexture(const std::filesystem::path& path) const {
-        glBindTexture(GL_TEXTURE_2D, texture);
-
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    // ReSharper disable once CppMemberFunctionMayBeStatic
+    void MeshesBuffer::loadTexture(const std::filesystem::path& path) {
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
         const auto source{IMG_Load(path.c_str())};
         SDL_Rect imageFrame{0, 0, source->w, source->h};
@@ -61,7 +55,6 @@ namespace rendermesh {
             redMask, greenMask, blueMask, alphaMask)};
 
         SDL_BlitSurface(source, &imageFrame, target, &imageFrame);
-        SDL_FreeSurface(source);
 
         if (target->pixels) {
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, imageFrame.w, imageFrame.h, 0,
@@ -69,14 +62,21 @@ namespace rendermesh {
             glGenerateMipmap(GL_TEXTURE_2D);
         }
         SDL_FreeSurface(target);
+        SDL_FreeSurface(source);
     }
 
     void MeshesBuffer::bindMeshModel(const u32 model) {
         auto position{std::begin(pipelines)};
         std::advance(position, model);
+        if (position == std::end(pipelines)) {
+            throw std::runtime_error("Out of bounds access");
+        }
         texture = position->texture;
         ebo = position->ebo;
-
         vbo = position->vbo;
+
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
     }
 }
