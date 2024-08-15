@@ -1,55 +1,14 @@
 // ReSharper disable CppDFANullDereference
 #include <fstream>
 #include <iostream>
+#include <print>
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <complex_mesh.h>
 #include <types.h>
 namespace rendermesh {
-    void MeshesBuffer::reset() const {
-        if (vao) {
-        }
-    }
-    void MeshesBuffer::bind() const {
-        glBindVertexArray(vao);
-    }
-    void MeshesBuffer::createVAO() {
-        glGenVertexArrays(1, &vao);
-        glBindVertexArray(vao);
-
-        glGenBuffers(2, &vbos[0]);
-    }
-
-    void MeshesBuffer::bindBuffer(const std::vector<Vertex>& triangles, const std::vector<GLuint>& indices) const {
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbos[EBO]);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices[0]) * indices.size(), &indices[0], GL_STATIC_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, vbos[PositionVBO]);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(triangles[0]) * triangles.size(), &triangles[0], GL_STATIC_DRAW);
-
-        // We are using the AOS memory model
-        // ReSharper disable once CppRedundantCastExpression
-        glVertexAttribPointer(positionsAttr, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, position)));
-        glEnableVertexAttribArray(positionsAttr);
-
-        // ReSharper disable once CppRedundantCastExpression
-        glVertexAttribPointer(normalsAttr, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, normal)));
-        glEnableVertexAttribArray(normalsAttr);
-
-        // ReSharper disable once CppRedundantCastExpression
-        glVertexAttribPointer(texturesAttr, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, texture)));
-        glEnableVertexAttribArray(texturesAttr);
-
-        glBindVertexArray(0);
-    }
-
-    void MeshesBuffer::draw(const GLsizei indices) const {
-        glBindVertexArray(vao);
-        glDrawElements(GL_TRIANGLES, indices, GL_UNSIGNED_INT, nullptr);
-    }
-
     ComplexMesh::ComplexMesh(Shaders& shader,
             const std::filesystem::path& path) : attach(shader) {
-        meshes.reset();
         meshes.createVAO();
 
         std::fstream model(path);
@@ -66,9 +25,10 @@ namespace rendermesh {
 
         loadAllVertices(shapes, attributes.vertices, attributes.normals, attributes.texcoords);
     }
-    void ComplexMesh::populateBuffers() const {
+    void ComplexMesh::populateBuffers() {
         meshes.bind();
         meshes.bindBuffer(triangles, indices);
+        meshes.loadTexture("");
     }
     void ComplexMesh::draw() const  {
         attach.useShaders();
@@ -79,8 +39,10 @@ namespace rendermesh {
         const std::vector<float>& normals, const std::vector<float>& texcoords) {
 
         std::unordered_map<Vertex, u32, HashVertex> uniqueVertices;
+        u32 total{};
         for (const auto& shape : shapes) {
             const auto& mesh{shape.mesh};
+            total += mesh.indices.size();
 
             u64 index{};
             for (; index < mesh.indices.size(); index++) {
@@ -116,5 +78,7 @@ namespace rendermesh {
                 indices.push_back(uniqueVertices[piramide]);
             }
         }
+        std::print("Total triangles obtained: {}\n", triangles.size());
+        std::print("Total indices obtained: {}\n", indices.size());
     }
 }

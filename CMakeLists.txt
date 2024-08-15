@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.21)
 project(RenderMesh)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(external/SDL EXCLUDE_FROM_ALL)
 add_subdirectory(external/tinyobjloader)
@@ -14,6 +15,8 @@ target_sources(rendermesh PRIVATE
     main.cpp
     complex_mesh.cpp
     complex_mesh.h
+    meshes_buffer.cpp
+    meshes_buffer.h
     main_window.cpp
     main_window.h
     render.cpp

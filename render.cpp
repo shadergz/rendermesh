@@ -6,7 +6,7 @@
 namespace rendermesh {
     void Render::render() const {
         bool quit{};
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         glEnable(GL_MULTISAMPLE);
         glViewport(0, 0, width, height);
 

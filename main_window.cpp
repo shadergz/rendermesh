@@ -18,6 +18,8 @@ namespace rendermesh {
         if (!main)
             throw std::runtime_error("Failed to create window: " + std::string(SDL_GetError()));
 
+        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 16);
         context = SDL_GL_CreateContext(main);
     }
 
