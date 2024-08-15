@@ -12,20 +12,23 @@ namespace rendermesh {
 
     static std::string vertex{
         "#version 440\n"
-        "layout (location = 0) in vec3 positions;\n"
-        "layout (location = 1) in vec3 normals;\n"
-        "layout (location = 2) in vec3 textures;\n"
+        "layout (location = 0) in vec3 position;\n"
+        "layout (location = 1) in vec3 normal;\n"
+        "layout (location = 2) in vec3 texture;\n"
+        "out vec3 colors;\n"
         "void main()\n"
         "{\n"
-        "   gl_Position = vec4(positions, 1.f);\n"
+        "   gl_Position = vec4(position, 1.f);\n"
+        "   colors = texture;\n"
         "}\n"
     };
     static std::string fragment {
         "#version 440\n"
-        "out vec4 FragColor;"
+        "in vec3 colors;\n"
+        "out vec4 FragColor;\n"
         "void main()\n"
         "{\n"
-        "   FragColor = vec4(1.0f, .5f, .2f, 1.f);\n"
+        "   FragColor = vec4(colors, 1.f);\n"
         "}\n"
     };
 

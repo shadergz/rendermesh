@@ -15,9 +15,20 @@ namespace rendermesh {
         EBO
     };
     struct Vertex {
+        Vertex() = default;
         glm::vec3 position;
         glm::vec3 normal;
         glm::vec2 texture;
+
+        auto operator == (const Vertex& other) const {
+            return other.position == position && other.normal == normal && other.texture == texture;
+        }
+    };
+    struct HashVertex {
+        u64 operator()(const Vertex& other) const {
+            return std::hash<float>()(other.position.x) ^ std::hash<float>()(other.position.y) ^
+                std::hash<float>()(other.position.z);
+        }
     };
 
     struct MeshesBuffer {
@@ -53,6 +64,6 @@ namespace rendermesh {
 
         std::vector<tinyobj::shape_t> shapes;
         std::vector<tinyobj::material_t> materials;
-        void loadAllVertices(const std::vector<tinyobj::shape_t>& shapes, u32& starts, const std::vector<float>& vertices, const std::vector<float>& normals, const std::vector<float> & texcoords);
+        void loadAllVertices(const std::vector<tinyobj::shape_t>& shapes, const std::vector<float>& vertices, const std::vector<float>& normals, const std::vector<float> & texcoords);
     };
 }

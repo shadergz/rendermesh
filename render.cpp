@@ -6,7 +6,10 @@
 namespace rendermesh {
     void Render::render() const {
         bool quit{};
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        glEnable(GL_MULTISAMPLE);
         glViewport(0, 0, width, height);
+
         while (!quit) {
             glClearColor(0, 0, 0, 1);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

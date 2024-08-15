@@ -22,9 +22,9 @@ namespace rendermesh {
 
     void MeshesBuffer::bindBuffer(const std::vector<Vertex>& triangles, const std::vector<GLuint>& indices) const {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbos[EBO]);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * indices.size(), &indices[0], GL_STATIC_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, vbos[0]);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * triangles.size(), &triangles[0], GL_STATIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices[0]) * indices.size(), &indices[0], GL_STATIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, vbos[PositionVBO]);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(triangles[0]) * triangles.size(), &triangles[0], GL_STATIC_DRAW);
 
         // We are using the AOS memory model
         // ReSharper disable once CppRedundantCastExpression
@@ -55,59 +55,66 @@ namespace rendermesh {
         std::fstream model(path);
         if (!model.is_open()) {
         }
-        std::string errors;
+        std::string warnings, errors;
 
-        tinyobj::attrib_t attributes;
-        LoadObj(&attributes, &shapes, &materials, &errors, path.c_str(), "./");
+        tinyobj::attrib_t attributes{};
+        LoadObj(&attributes, &shapes, &materials, &warnings, &errors, path.c_str(), "./");
         if (!errors.empty()) {
             std::cout << errors << '\n';
             std::terminate();
         }
 
-        u32 starts{};
-        loadAllVertices(shapes, starts, attributes.vertices, attributes.normals, attributes.texcoords);
+        loadAllVertices(shapes, attributes.vertices, attributes.normals, attributes.texcoords);
     }
     void ComplexMesh::populateBuffers() const {
+        meshes.bind();
         meshes.bindBuffer(triangles, indices);
     }
-    void ComplexMesh::draw() const {
+    void ComplexMesh::draw() const  {
         attach.useShaders();
         meshes.draw(indices.size());
     }
 
-    void ComplexMesh::loadAllVertices(const std::vector<tinyobj::shape_t>& shapes, u32& starts, const std::vector<float>& vertices,
+    void ComplexMesh::loadAllVertices(const std::vector<tinyobj::shape_t>& shapes, const std::vector<float>& vertices,
         const std::vector<float>& normals, const std::vector<float>& texcoords) {
 
+        std::unordered_map<Vertex, u32, HashVertex> uniqueVertices;
         for (const auto& shape : shapes) {
             const auto& mesh{shape.mesh};
 
-            const u64 filledSize{triangles.size()};
-            triangles.resize(filledSize + mesh.indices.size());
-
-            u64 mei{};
-            for (; mei < mesh.indices.size(); mei++) {
-                const auto& properties{mesh.indices[mei]};
-                triangles[mei + starts].position = {
-                    vertices[properties.vertex_index * 3],
-                    vertices[properties.vertex_index * 3 + 1],
-                    vertices[properties.vertex_index * 3 + 2]
+            u64 index{};
+            for (; index < mesh.indices.size(); index++) {
+                Vertex piramide{};
+                const auto& realMap{mesh.indices[index]};
+                piramide.position = {
+                    vertices[3 * realMap.vertex_index + 0],
+                    vertices[3 * realMap.vertex_index + 1],
+                    vertices[3 * realMap.vertex_index + 2],
+                };
+                piramide.normal = {
+                    normals[3 * realMap.normal_index + 0],
+                    normals[3 * realMap.normal_index + 1],
+                    normals[3 * realMap.normal_index + 2],
                 };
 
-                triangles[mei + starts].normal = {
-                    normals[properties.normal_index * 3],
-                    normals[properties.normal_index * 3 + 1],
-                    normals[properties.normal_index * 3 + 2]
-                };
-                triangles[mei + starts].texture = {};
-                if (properties.texcoord_index >= 0) {
-                    triangles[mei + starts].texture = {
-                        texcoords[properties.texcoord_index * 2],
-                        texcoords[properties.texcoord_index * 2 + 1],
-                    };
+                piramide.texture = {};
+
+                if (!texcoords.empty()) {
+                    const auto textCoord0{texcoords[3 * realMap.texcoord_index + 0]};
+                    const auto textCoord1{texcoords[3 * realMap.texcoord_index + 1]};
+                    if (textCoord0 >= 0 && textCoord1 >= 0) {
+                        piramide.texture = {
+                            textCoord0, textCoord1
+                        };
+                    }
                 }
-                indices.emplace_back(mei + starts);
+
+                if (!uniqueVertices.contains(piramide)) {
+                    uniqueVertices[piramide] = triangles.size();
+                    triangles.push_back(piramide);
+                }
+                indices.push_back(uniqueVertices[piramide]);
             }
-            starts += mei;
         }
     }
 }
