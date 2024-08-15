@@ -10,37 +10,44 @@
 #include <backends/imgui_impl_opengl3.h>
 #include <backends/imgui_impl_sdl2.h>
 
-#include <render.h>
-namespace rendermesh {
-    constexpr auto maxOfLoadableModel{12};
-    Render::Render(MainWindow& main) :
+#include <core/render.h>
+namespace rendermesh::core {
+    Render::Render(window::MainWindow& main) :
         window(main) {
 
-        glGenVertexArrays(1, &vao);
-        glBindVertexArray(vao);
-        buffers.resize(maxOfLoadableModel);
-
-        for (auto& modelBuffers : buffers) {
-            glGenBuffers(1, &modelBuffers.ebo);
-            glGenBuffers(1, &modelBuffers.vbo);
-
-            glGenTextures(1, &modelBuffers.texture);
+        GLint extensions;
+        glGetIntegerv(GL_NUM_EXTENSIONS, &extensions);
+        std::vector<std::string> supported;
+        for (u32 ext{}; ext < extensions; ext++) {
+            const auto name{glGetStringi(GL_EXTENSIONS, ext)};
+            if (name)
+                supported.push_back(reinterpret_cast<const char*>(name));
         }
+        // Checking if the host supports anisotropic filtering functionality
+        GLfloat amount;
+        bool enbAFilter{};
+        if (std::ranges::find(supported, "GL_EXT_texture_filter_anisotropic") != supported.end()) {
+            glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &amount);
+            enbAFilter = true;
+        }
+
+        pipeline = buffer::Pipeline(enbAFilter, amount);
 
         i32 h, w;
         SDL_GetWindowSize(window.main, &w, &h);
 
-        shader = std::make_unique<Shaders>();
-        mvp = shader->getMvpVar();
-        buffer = std::make_shared<MeshesBuffer>(buffers);
-        camera = Camera(static_cast<f32>(h), static_cast<f32>(w));
-    }
+        shader = std::make_shared<raster::Shaders>();
+        submitter = std::make_shared<buffer::Submit>(shader, pipeline);
+        camera = view::Camera(static_cast<f32>(h), static_cast<f32>(w));
 
-    void Render::render() {
-        bool quit{};
         glEnable(GL_MULTISAMPLE);
         glEnable(GL_DEPTH_TEST);
-        glViewport(0, 0, width, height);
+        glViewport(0, 0, window::width, window::height);
+    }
+
+    // This is our main rendering function
+    void Render::render() {
+        bool quit{};
 
         window.walk = [&](const SDL_Keysym& kb) {
             camera.walkAround(kb);
@@ -66,31 +73,29 @@ namespace rendermesh {
 
         while (!quit) {
             beginTime = GetTicks::now();
+
+            shader->activate();
+
+            if (selected.empty())
+                if (files.size())
+                    open(files.back());
+
             camera.setCameraSpeed(cs);
             window.receiveEvents(quit);
-
-            ImGui_ImplOpenGL3_NewFrame();
-            ImGui_ImplSDL2_NewFrame();
-            ImGui::NewFrame();
 
             glClearColor(bgColor[0], bgColor[1], bgColor[2], bgColor[3]);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            drawUi();
+            draw(camera.getViewMatrix());
 
-            const auto view{camera.getViewMatrix()};
-            draw(view);
-
-            ImGui::Render();
-            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-            glFlush();
             endTime = GetTicks::now();
             SDL_GL_SwapWindow(window.main);
 
             frames++;
 
             deltaTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - beginTime).count();
+
+            shader->drop();
         }
     }
 
@@ -109,21 +114,26 @@ namespace rendermesh {
             if (!exists(file))
                 throw std::runtime_error("File does not exist");
         }
-
-        if (files.size())
-            open(files.back());
     }
 
     void Render::open(const std::filesystem::path& path) {
+        pipeline.bind();
+
         if (mesh)
             mesh.reset();
-        mesh = std::make_unique<ComplexModel>(buffer, path);
+        submitter->reset();
+        mesh = std::make_unique<mesh::Complex>(submitter, path);
         mesh->populateBuffers();
 
         selected = path;
+        pipeline.flush();
     }
 
     void Render::drawUi() {
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplSDL2_NewFrame();
+        ImGui::NewFrame();
+
         bool isActivate{};
         ImGui::Begin("Scene", &isActivate, ImGuiWindowFlags_MenuBar);
         const auto fileDialog{ImGuiFileDialog::Instance()};
@@ -168,13 +178,14 @@ namespace rendermesh {
         ImGui::TableSetupColumn("Recent Objects");
 
         ImGui::TableHeadersRow();
+        ImGui::TableNextColumn();
         for (u32 index{}; index < files.size(); index++) {
-            ImGui::Text(files[index].c_str());
+            ImGui::Text((files[index].parent_path().filename() / files[index].filename()).c_str());
 
             if (files[index] == selected)
                 ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0 + index, ImGui::GetColorU32(ImVec4(0.7f, 0.3f, 0.3f, 0.65f)));
 
-            if (ImGui::IsItemClicked()) {
+            if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
                 if (selected != files[index]) {
                     std::print("Selected: {}\n", files[index].string());
                     open(files[index]);
@@ -188,16 +199,20 @@ namespace rendermesh {
         ImGui::End();
     }
 
-    void Render::draw(const glm::mat4& view) const {
-        // All the drawing work is done here
-        glBindVertexArray(vao);
-        glUniformMatrix4fv(mvp, 1, GL_FALSE, &view[0][0]);
+    void Render::draw(const glm::mat4& view) {
+        drawUi();
 
-        shader->useShaders();
+        // All the drawing work is done here
+        pipeline.bind();
+        submitter->accMvp(view, true);
+
         if (mesh)
             mesh->draw();
 
-        glBindVertexArray(0);
+        pipeline.flush();
+
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     }
 
     glm::mat4 Render::transformMesh() {

@@ -1,11 +1,11 @@
 
-#include <render.h>
+#include <core/render.h>
 int main(const int argc, char** argv) {
     namespace rm = rendermesh;
-    rm::MainWindow window;
+    rm::window::MainWindow window;
     window.create();
 
-    rm::Render graphics(window);
+    rm::core::Render graphics(window);
     std::vector<char*> args;
     for (int i = 1; i < argc; i++) {
         args.push_back(argv[i]);

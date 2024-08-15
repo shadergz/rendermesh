@@ -3,7 +3,7 @@
 #include <glm/glm.hpp>
 
 #include <types.h>
-namespace rendermesh {
+namespace rendermesh::view {
     class Camera {
     public:
         Camera() = default;

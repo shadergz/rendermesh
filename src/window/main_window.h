@@ -3,7 +3,7 @@
 #include <SDL2/SDL.h>
 
 #include <types.h>
-namespace rendermesh {
+namespace rendermesh::window {
     constexpr auto width{700};
     constexpr auto height{700};
 

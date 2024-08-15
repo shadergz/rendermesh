@@ -7,8 +7,8 @@
 #include <backends/imgui_impl_opengl3.h>
 #include <backends/imgui_impl_sdl2.h>
 
-#include <main_window.h>
-namespace rendermesh {
+#include <window/main_window.h>
+namespace rendermesh::window {
     constexpr auto leftButton{SDL_BUTTON_LEFT};
     MainWindow::~MainWindow() {
         // Frees memory
@@ -34,7 +34,7 @@ namespace rendermesh {
             throw std::runtime_error("Failed to create window: " + std::string(SDL_GetError()));
 
         SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 16);
+        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 8);
         context = SDL_GL_CreateContext(main);
         SDL_GL_MakeCurrent(main, context);
         // Enable vsync

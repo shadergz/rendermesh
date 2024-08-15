@@ -1,34 +1,32 @@
 #pragma once
-#include <list>
 #include <array>
 
-#include <main_window.h>
-#include <complex_model.h>
-#include <camera.h>
+#include <window/main_window.h>
+#include <mesh/complex.h>
+#include <view/camera.h>
 
-namespace rendermesh {
+#include <buffer/pipeline.h>
+namespace rendermesh::core {
     class Render {
     public:
-        explicit Render(MainWindow& main);
+        explicit Render(window::MainWindow& main);
         void render();
         void initialize(const std::vector<char*>& args);
         void open(const std::filesystem::path& path);
-        void drawUi();
 
-        void draw(const glm::mat4& view) const;
+        void drawUi();
+        void draw(const glm::mat4& view);
 
         static glm::mat4 transformMesh();
-        MainWindow& window;
-        std::unique_ptr<ComplexModel> mesh;
+        window::MainWindow& window;
+        std::unique_ptr<mesh::Complex> mesh;
 
-        std::shared_ptr<MeshesBuffer> buffer;
-        Camera camera;
+        std::shared_ptr<buffer::Submit> submitter;
+        view::Camera camera;
 
-        std::unique_ptr<Shaders> shader;
+        std::shared_ptr<raster::Shaders> shader;
 
-        GLuint mvp{};
-        GLuint vao{};
-        std::list<MeshPipelineBuffers> buffers;
+        buffer::Pipeline pipeline;
         std::vector<std::filesystem::path> files;
 
         using FasterClock = std::chrono::time_point<std::chrono::high_resolution_clock>;
@@ -43,7 +41,7 @@ namespace rendermesh {
 
         std::array<f32, 200> framesSamples{};
         u32 sample{};
-        std::array<float, 4> bgColor{0.f, 0.f, 0.125f, 1.f};
+        std::array<float, 4> bgColor{.06f, .90f, .98f, 1.f};
         f32 cs{0.05f};
 
         std::filesystem::path selected;

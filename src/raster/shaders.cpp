@@ -1,14 +1,14 @@
-#define GL_GLEXT_PROTOTYPES
 #include <exception>
 #include <iostream>
-#include <SDL2/SDL_opengl.h>
-#include <shaders.h>
 #include <stdexcept>
-
-#include <types.h>
 #include <vector>
 
-namespace rendermesh {
+#define GL_GLEXT_PROTOTYPES
+#include <SDL2/SDL_opengl.h>
+
+#include <types.h>
+#include <raster/shaders.h>
+namespace rendermesh::raster {
 
     static std::string vertex{
         "#version 440\n"
@@ -18,12 +18,10 @@ namespace rendermesh {
         "\n"
         "\n"
         "uniform mat4 mvp;\n"
-        "out vec3 colors;\n"
         "out vec2 TexCoord;\n"
         "void main()\n"
         "{\n"
         "   gl_Position = mvp * vec4(position, 1.f);\n"
-        "   colors = normal;\n"
         "   TexCoord = texture;\n"
         "}\n"
     };
@@ -31,12 +29,16 @@ namespace rendermesh {
         "#version 440\n"
         "out vec4 FragColor;\n"
         "in vec2 TexCoord;\n"
-        "in vec3 colors;\n"
         "\n"
-        "uniform sampler2D tex;\n"
+        "uniform sampler2D diffuse;\n"
+        "uniform sampler2D specular;\n"
+        "uniform sampler2D emissive;\n"
         "void main()\n"
         "{\n"
-        "   FragColor = texture(tex, TexCoord);\n"
+        "   vec3 diff = vec3(texture(diffuse, TexCoord));\n"
+        "   vec3 spec = vec3(texture(specular, TexCoord));\n"
+        "   vec3 emi = vec3(texture(emissive, TexCoord));\n"
+        "   FragColor = vec4(diff + spec + emi, 1.0);\n"
         "}\n"
     };
 
@@ -67,15 +69,29 @@ namespace rendermesh {
         program = vertexShader = fragmentShader = {};
     }
 
-    void Shaders::useShaders() const {
+    void Shaders::activate() const {
         if (!glIsProgram(program)) {
             throw std::runtime_error("");
         }
         glUseProgram(program);
     }
 
-    GLuint Shaders::getMvpVar() const {
-        return glGetUniformLocation(program, "mvp");
+    void Shaders::drop() const {
+        if (isCurrent())
+            glUseProgram(0);
+    }
+
+    GLuint Shaders::getUniform(const std::string_view property) const {
+        if (!isCurrent())
+            throw std::runtime_error("No shaders have been loaded yet");
+
+        return glGetUniformLocation(program, property.data());
+    }
+
+    bool Shaders::isCurrent() const {
+        GLint running;
+        glGetIntegerv(GL_CURRENT_PROGRAM, &running);
+        return program == running;
     }
 
     void Shaders::compileShader(const u32& shader, const std::string& source) {

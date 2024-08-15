@@ -1,10 +1,9 @@
-#include <camera.h>
-
 #include <glm/trigonometric.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 
-namespace rendermesh {
+#include <view/camera.h>
+namespace rendermesh::view {
     Camera::Camera(const f32 width, const f32 height) {
         static constexpr auto fieldOfView{60.f};
         projection = glm::perspective(
