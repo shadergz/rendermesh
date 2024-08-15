@@ -63,7 +63,6 @@ namespace rendermesh {
                 !io.WantCaptureMouse) {
 
                 SDL_GetMouseState(&mouseX, &mouseY);
-                std::print("X: {} Y: {}\n", mouseX, mouseY);
                 look(static_cast<f32>(mouseX), static_cast<f32>(mouseY));
             }
             if (event.type == SDL_KEYUP) {

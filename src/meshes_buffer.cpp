@@ -9,23 +9,24 @@ namespace rendermesh {
         glBufferData(GL_ARRAY_BUFFER, sizeof(triangles[0]) * triangles.size(), &triangles[0], GL_STATIC_DRAW);
 
         // We are using the AOS memory model
-        // ReSharper disable once CppRedundantCastExpression
-        glVertexAttribPointer(positionsAttr, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, position)));
         glEnableVertexAttribArray(positionsAttr);
+        glVertexAttribPointer(positionsAttr, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
 
-        // ReSharper disable once CppRedundantCastExpression
-        glVertexAttribPointer(normalsAttr, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, normal)));
         glEnableVertexAttribArray(normalsAttr);
+        glVertexAttribPointer(normalsAttr, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, normal)));
 
-        // ReSharper disable once CppRedundantCastExpression
-        glVertexAttribPointer(texturesAttr, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, texture)));
         glEnableVertexAttribArray(texturesAttr);
+        glVertexAttribPointer(texturesAttr, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, texture)));
     }
 
     void MeshesBuffer::drawBuffers(const u32 indices) const {
         // Binds the texture to our object in the fragment shader 'tex'
         glBindTexture(GL_TEXTURE_2D, texture);
         glDrawElements(GL_TRIANGLES, indices, GL_UNSIGNED_INT, nullptr);
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        glBindTexture(GL_TEXTURE_2D, 0);
     }
 
     // ReSharper disable once CppMemberFunctionMayBeStatic

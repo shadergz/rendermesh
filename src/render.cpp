@@ -96,12 +96,13 @@ namespace rendermesh {
 
     void Render::initialize(const std::vector<char*>& args) {
         for (const auto argument : args) {
-            if (std::string(".obj") == std::filesystem::path(argument).extension()) {
-                const auto file{std::filesystem::canonical(argument)};
-                if (std::ranges::find(files, file) != files.end())
-                    throw std::runtime_error("Already exists");
-
-                files.emplace_back(file);
+            for (const auto desired : {".obj", ".gltf", ".glb"}) {
+                if (std::string_view(desired) == std::filesystem::path(argument).extension()) {
+                    const auto file{std::filesystem::canonical(argument)};
+                    if (std::ranges::find(files, file) != files.end())
+                        throw std::runtime_error("Already exists");
+                    files.emplace_back(file);
+                }
             }
         }
         for (const auto& file : files) {
@@ -114,8 +115,9 @@ namespace rendermesh {
     }
 
     void Render::open(const std::filesystem::path& path) {
-        auto droppedMesh{std::make_unique<ComplexModel>(buffer, path)};
-        mesh.swap(droppedMesh);
+        if (mesh)
+            mesh.reset();
+        mesh = std::make_unique<ComplexModel>(buffer, path);
         mesh->populateBuffers();
 
         selected = path;
@@ -129,7 +131,7 @@ namespace rendermesh {
             if (ImGui::BeginMenu("File")) {
                 if (ImGui::MenuItem("Open", "Ctrl+O")) {
                     const IGFD::FileDialogConfig config{.path = "."};
-                    fileDialog->OpenDialog("ChooseFileDlgKey", "Choose File", ".obj", config);
+                    fileDialog->OpenDialog("ChooseFileDlgKey", "Choose File", ".obj,.gltf,.glb", config);
                 }
                 ImGui::EndMenu();
             }

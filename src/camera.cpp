@@ -46,10 +46,10 @@ namespace rendermesh {
         yaw += mouseDelta.x;
         pitch += mouseDelta.y;
 
-        if (pitch > 89.0f)
-            pitch = 89.0f;
-        if (pitch < -89.0f)
-            pitch = -89.0f;
+        if (pitch > 90.0f)
+            pitch = 90.0f;
+        if (pitch < -90.0f)
+            pitch = -90.0f;
 
         const glm::vec3 direction{
             cos(glm::radians(yaw)) * cos(glm::radians(pitch)),

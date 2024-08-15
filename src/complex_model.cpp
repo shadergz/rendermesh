@@ -1,61 +1,51 @@
 // ReSharper disable CppDFANullDereference
 #include <iostream>
+#include <fstream>
 #include <print>
+#include <span>
 
-#define TINYOBJLOADER_IMPLEMENTATION
+#include <assimp/postprocess.h>
 #include <complex_model.h>
-#include <types.h>
 namespace rendermesh {
-    ComplexModel::ComplexModel(std::shared_ptr<MeshesBuffer>& buffer, const std::filesystem::path& path) :
+    ComplexModel::ComplexModel(const std::shared_ptr<MeshesBuffer>& buffer, const std::filesystem::path& path) :
         meshesBuffer(buffer) {
 
         std::fstream model(path);
         if (!model.is_open()) {
         }
-        std::string warnings, errors;
-
-        tinyobj::attrib_t attributes{};
         if (path.has_parent_path()) {
-            mtlDir = path.parent_path();
+            objDir = path.parent_path();
         }
-        LoadObj(&attributes, &shapes, &materials, &warnings, &errors, path.c_str(), mtlDir.c_str());
-        if (!errors.empty()) {
-            std::cout << errors << '\n';
-            std::terminate();
+        Assimp::Importer importer;
+        const auto scene{importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs)};
+        if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
+            throw std::runtime_error(std::format("Assimp: {}", importer.GetErrorString()));
         }
 
         MeshModel mesh{};
-        for (const auto& shape : shapes) {
-            mesh.pipeline = graphics++;
 
-            std::string texName;
-            buildTriangles(shape, mesh, attributes.vertices, attributes.normals, attributes.texcoords);
+        std::function<void(const aiNode& node)> processAiNode = [&](const aiNode& node) {
+            for (const auto aiMesh : std::span(node.mMeshes, node.mNumMeshes)) {
+                const auto implMesh{scene->mMeshes[aiMesh]};
+                processMesh(mesh, *implMesh, *scene);
+                mesh.pipeline = graphics++;
+                meshes.emplace_back(std::move(mesh));
 
-            if (mesh.textured < materials.size()) {
-                texName = materials[mesh.textured].diffuse_texname;
-                if (texName.empty())
-                    texName = materials[mesh.textured].bump_texname;
-
-                while (texName.find('\\') != std::string::npos) {
-                    auto begin{texName.find('\\')};
-                    auto end{begin};
-                    while (texName[end] == '\\')
-                        end++;
-
-                    texName[begin] = '/';
-                    texName.erase(begin + 1, end - begin - 1);
-                }
+                mesh = {};
             }
-
-            getTexturePath(mesh.texture, path, texName);
-            meshes.emplace_back(std::move(mesh));
-        }
+            for (const auto children : std::span(node.mChildren, node.mNumChildren)) {
+                processAiNode(*children);
+            }
+        };
+        processAiNode(*scene->mRootNode);
     }
     void ComplexModel::populateBuffers() const {
         for (const auto& mesh : meshes) {
             meshesBuffer->bindMeshModel(mesh.pipeline);
 
-            meshesBuffer->loadTexture(mesh.texture);
+            for (const auto& textures : mesh.textures) {
+                meshesBuffer->loadTexture(textures.path);
+            }
             meshesBuffer->bindBuffer(mesh.triangles, mesh.indices);
         }
     }
@@ -67,67 +57,96 @@ namespace rendermesh {
         }
     }
 
-    void ComplexModel::buildTriangles(const tinyobj::shape_t& shape, MeshModel& modelMesh,
-        const std::vector<f32>& vertices,
-        const std::vector<f32>& normals, const std::vector<f32>& texcoords) {
+    void ComplexModel::processMesh(MeshModel& modelMesh,
+        const aiMesh& implMesh, const aiScene& scene) const {
 
-        const auto& mesh{shape.mesh};
+        std::unordered_map<Vertex, u32, HashVertex> uniqueVertices;
         auto& triangles{modelMesh.triangles};
         auto& indices{modelMesh.indices};
 
-        modelMesh.textured = mesh.material_ids[0];
+        const auto vertices{std::span(implMesh.mVertices, implMesh.mNumVertices)};
 
-        for (const auto& realMap : mesh.indices) {
+        std::span<aiVector3D> normals{};
+        if (implMesh.mNormals) {
+            normals = std::span(implMesh.mNormals, implMesh.mNumVertices);
+        }
+        std::span<aiVector3D> texcoords{};
+        if (implMesh.mTextureCoords[0]) {
+            texcoords = std::span(implMesh.mTextureCoords[0], implMesh.mNumVertices);
+        }
+
+        for (u32 verticesCount{}; verticesCount < implMesh.mNumVertices; verticesCount++) {
+
             Vertex vertex{};
             vertex.position = {
-                vertices[3 * realMap.vertex_index + 0],
-                vertices[3 * realMap.vertex_index + 1],
-                vertices[3 * realMap.vertex_index + 2],
+                vertices[verticesCount].x,
+                vertices[verticesCount].y,
+                vertices[verticesCount].z
             };
             if (!normals.empty()) {
                 vertex.normal = {
-                    normals[3 * realMap.normal_index + 0],
-                    normals[3 * realMap.normal_index + 1],
-                    normals[3 * realMap.normal_index + 2],
+                    normals[verticesCount].x,
+                    normals[verticesCount].y,
+                    normals[verticesCount].z,
                 };
             }
-            if (!texcoords.empty()) {
-                const auto texCoordX{texcoords[2 * realMap.texcoord_index + 0]};
-                const auto texCoordY{texcoords[2 * realMap.texcoord_index + 1]};
-                if (texCoordX >= 0 && texCoordY >= 0) {
-                    vertex.texture = {
-                        texCoordX, 1.f - texCoordY
-                    };
-                }
+            if (texcoords.size() > verticesCount) {
+                vertex.texture = {
+                    texcoords[verticesCount].x,
+                    texcoords[verticesCount].y,
+                };
             }
-
-            if (!uniqueVertices.contains(vertex)) {
-                uniqueVertices[vertex] = static_cast<u32>(triangles.size());
-                triangles.push_back(vertex);
-            }
-            indices.push_back(uniqueVertices[vertex]);
+            triangles.push_back(vertex);
         }
+
+        for (const auto face : std::span(implMesh.mFaces, implMesh.mNumFaces)) {
+            for (const auto index : std::span(face.mIndices, face.mNumIndices)) {
+                indices.push_back(index);
+            }
+        }
+
+        if (implMesh.mMaterialIndex != -1) {
+            auto& textures{modelMesh.textures};
+
+            const auto material{scene.mMaterials[implMesh.mMaterialIndex]};
+            auto diffuseMaps{getTextureMaps(*material, aiTextureType_DIFFUSE)};
+            auto specularMaps{getTextureMaps(*material, aiTextureType_SPECULAR)};
+            auto emissiveMaps{getTextureMaps(*material, aiTextureType_EMISSIVE)};
+
+            textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
+            textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
+            textures.insert(textures.end(), emissiveMaps.begin(), emissiveMaps.end());
+        }
+
         std::print("Total triangles obtained: {}\n", triangles.size());
         std::print("Total indices obtained: {}\n", indices.size());
     }
 
-    void ComplexModel::getTexturePath(std::filesystem::path& output,
-        const std::filesystem::path& model, const std::filesystem::path& tex) const {
+    std::vector<Texture> ComplexModel::getTextureMaps(
+        const aiMaterial& material, const aiTextureType type) const {
+        std::vector<Texture> textures;
 
-        auto imagePath{model};
+        if (objDir.empty())
+            throw std::runtime_error("");
 
-        if (!tex.has_filename()) {
-            imagePath.replace_extension("jpg");
-            if (exists(imagePath))
-                output = imagePath;
-            imagePath.replace_extension("png");
-            if (exists(imagePath))
-                output = imagePath;
-        } else {
-            output = mtlDir / tex;
+        Texture meshMaterial;
+        for (u32 matIndex{}; matIndex < material.GetTextureCount(type); matIndex++) {
+            aiString aiPath;
+            material.GetTexture(type, matIndex, &aiPath);
+
+            std::filesystem::path texture(objDir);
+            texture.append(std::string(aiPath.data, std::strlen(aiPath.data)));
+
+            std::print("Texture path {}\n", texture.string());
+            if (!exists(texture) && !is_regular_file(texture))
+                throw std::runtime_error("No texture was loaded for the object, check the import locations");
+
+            meshMaterial.path = texture;
+            meshMaterial.type = type;
+
+            textures.emplace_back(meshMaterial);
         }
-        std::print("Texture path {}\n", output.string());
-        if (!exists(output) && !is_regular_file(output))
-            throw std::runtime_error("No texture was loaded for the object, check the import locations");
+
+        return textures;
     }
 }

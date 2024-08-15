@@ -23,8 +23,7 @@ namespace rendermesh {
     struct HashVertex {
         std::size_t operator()(const Vertex& other) const {
             return (std::hash<glm::vec3>()(other.position) ^
-                (std::hash<glm::vec3>()(other.normal) ^
-                    (std::hash<glm::vec2>()(other.texture) << 1)) >> 1);
+                (std::hash<glm::vec3>()(other.normal) ^ (std::hash<glm::vec2>()(other.texture))));
         }
     };
 
