@@ -11,7 +11,7 @@ namespace rendermesh {
         glViewport(0, 0, width, height);
 
         while (!quit) {
-            glClearColor(0, 0, 0, 1);
+            glClearColor(0.f, 0.f, 0.f, 1);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             window.receiveEvents(quit);

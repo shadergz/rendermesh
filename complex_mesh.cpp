@@ -17,20 +17,41 @@ namespace rendermesh {
         std::string warnings, errors;
 
         tinyobj::attrib_t attributes{};
-        LoadObj(&attributes, &shapes, &materials, &warnings, &errors, path.c_str(), "./");
+        std::filesystem::path mtlDir{"./"};
+        if (path.has_parent_path()) {
+            mtlDir = path.parent_path();
+        }
+        LoadObj(&attributes, &shapes, &materials, &warnings, &errors, path.c_str(), mtlDir.c_str());
         if (!errors.empty()) {
             std::cout << errors << '\n';
             std::terminate();
         }
 
         loadAllVertices(shapes, attributes.vertices, attributes.normals, attributes.texcoords);
+
+        std::string texName{};
+        if (textured < materials.size())
+            texName = materials[textured].diffuse_texname;
+        if (!texName.empty())
+            texture = std::make_pair(texName, mtlDir);
+        auto objTextured{path};
+
+        objTextured.replace_extension("jpg");
+
+        if (exists(objTextured))
+            texture = std::make_pair(objTextured.string(), std::filesystem::path{});
+
+        objTextured.replace_extension("png");
+        if (exists(objTextured))
+            texture = std::make_pair(objTextured.string(), std::filesystem::path{});
     }
     void ComplexMesh::populateBuffers() {
         meshes.bind();
+        meshes.loadTexture({std::get<1>(texture) / std::get<0>(texture)});
+
         meshes.bindBuffer(triangles, indices);
-        meshes.loadTexture("");
     }
-    void ComplexMesh::draw() const  {
+    void ComplexMesh::draw() const {
         attach.useShaders();
         meshes.draw(indices.size());
     }
@@ -39,44 +60,43 @@ namespace rendermesh {
         const std::vector<float>& normals, const std::vector<float>& texcoords) {
 
         std::unordered_map<Vertex, u32, HashVertex> uniqueVertices;
-        u32 total{};
-        for (const auto& shape : shapes) {
-            const auto& mesh{shape.mesh};
-            total += mesh.indices.size();
+        const auto& model{shapes[0]};
+        const auto& mesh{model.mesh};
+        textured = mesh.material_ids[0];
 
-            u64 index{};
-            for (; index < mesh.indices.size(); index++) {
-                Vertex piramide{};
-                const auto& realMap{mesh.indices[index]};
-                piramide.position = {
-                    vertices[3 * realMap.vertex_index + 0],
-                    vertices[3 * realMap.vertex_index + 1],
-                    vertices[3 * realMap.vertex_index + 2],
-                };
+        for (u64 index{}; index < mesh.indices.size(); index++) {
+            Vertex piramide{};
+            const auto& realMap{mesh.indices[index]};
+            piramide.position = {
+                vertices[3 * realMap.vertex_index + 0],
+                vertices[3 * realMap.vertex_index + 1],
+                vertices[3 * realMap.vertex_index + 2],
+            };
+            if (!normals.empty()) {
                 piramide.normal = {
                     normals[3 * realMap.normal_index + 0],
                     normals[3 * realMap.normal_index + 1],
                     normals[3 * realMap.normal_index + 2],
                 };
-
-                piramide.texture = {};
-
-                if (!texcoords.empty()) {
-                    const auto textCoord0{texcoords[3 * realMap.texcoord_index + 0]};
-                    const auto textCoord1{texcoords[3 * realMap.texcoord_index + 1]};
-                    if (textCoord0 >= 0 && textCoord1 >= 0) {
-                        piramide.texture = {
-                            textCoord0, textCoord1
-                        };
-                    }
-                }
-
-                if (!uniqueVertices.contains(piramide)) {
-                    uniqueVertices[piramide] = triangles.size();
-                    triangles.push_back(piramide);
-                }
-                indices.push_back(uniqueVertices[piramide]);
             }
+
+            piramide.texture = {};
+
+            if (!texcoords.empty()) {
+                const auto textCoord0{texcoords[3 * realMap.texcoord_index + 0]};
+                const auto textCoord1{texcoords[3 * realMap.texcoord_index + 1]};
+                if (textCoord0 >= 0 && textCoord1 >= 0) {
+                    piramide.texture = {
+                        textCoord0, textCoord1
+                    };
+                }
+            }
+
+            if (!uniqueVertices.contains(piramide)) {
+                uniqueVertices[piramide] = triangles.size();
+                triangles.push_back(piramide);
+            }
+            indices.push_back(uniqueVertices[piramide]);
         }
         std::print("Total triangles obtained: {}\n", triangles.size());
         std::print("Total indices obtained: {}\n", indices.size());

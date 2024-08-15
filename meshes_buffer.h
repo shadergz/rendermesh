@@ -43,7 +43,7 @@ namespace rendermesh {
 
         void bindBuffer(const std::vector<Vertex>& triangles, const std::vector<GLuint>& indices) const;
 
-        void loadTexture(const std::filesystem::path& textureName);
+        void loadTexture(const std::filesystem::path& path);
         void draw(GLsizei indices) const;
 
     private:

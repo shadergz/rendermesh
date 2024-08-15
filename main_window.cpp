@@ -2,6 +2,7 @@
 #include <string>
 
 #include <main_window.h>
+#include <SDL_image.h>
 namespace rendermesh {
     MainWindow::~MainWindow() {
         // Frees memory
@@ -14,7 +15,8 @@ namespace rendermesh {
         if (SDL_Init(SDL_INIT_VIDEO) != 0) {
             throw std::runtime_error("SDL Failed: " + std::string(SDL_GetError()));
         }
-        main = SDL_CreateWindow("Mesh GL", 0, 0, width, height, windowFlags);
+        IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG);
+        main = SDL_CreateWindow("Mesh Loader", 0, 0, width, height, windowFlags);
         if (!main)
             throw std::runtime_error("Failed to create window: " + std::string(SDL_GetError()));
 

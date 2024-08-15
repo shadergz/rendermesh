@@ -23,6 +23,9 @@ namespace rendermesh {
 
         std::vector<tinyobj::shape_t> shapes{};
         std::vector<tinyobj::material_t> materials{};
-        void loadAllVertices(const std::vector<tinyobj::shape_t>& shapes, const std::vector<float>& vertices, const std::vector<float>& normals, const std::vector<float> & texcoords);
+        void loadAllVertices(const std::vector<tinyobj::shape_t>& shapes, const std::vector<float>& vertices, const std::vector<float>& normals, const std::vector<float>& texcoords);
+
+        u64 textured{std::numeric_limits<u64>::max()};
+        std::pair<std::string, std::filesystem::path> texture;
     };
 }

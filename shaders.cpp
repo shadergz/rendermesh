@@ -35,7 +35,7 @@ namespace rendermesh {
         "uniform sampler2D tex;\n"
         "void main()\n"
         "{\n"
-        "   FragColor = vec4(colors, 1.f);\n"
+        "   FragColor = texture(tex, TexCoord) * vec4(colors, 1.f);\n"
         "}\n"
     };
 

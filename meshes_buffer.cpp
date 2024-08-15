@@ -1,5 +1,6 @@
 #define GL_GLEXT_PROTOTYPES
 #include <SDL2/SDL_opengl.h>
+#include <SDL_image.h>
 
 #include <meshes_buffer.h>
 namespace rendermesh {
@@ -43,7 +44,7 @@ namespace rendermesh {
         glBindVertexArray(0);
     }
 
-    void MeshesBuffer::loadTexture([[maybe_unused]] const std::filesystem::path& textureName) {
+    void MeshesBuffer::loadTexture([[maybe_unused]] const std::filesystem::path& path) {
         glGenTextures(1, &texture);
         glBindTexture(GL_TEXTURE_2D, texture);
 
@@ -51,6 +52,37 @@ namespace rendermesh {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        const auto source{IMG_Load(path.c_str())};
+        SDL_Rect imageFrame{0, 0, source->w, source->h};
+        uint32_t redMask;
+        uint32_t greenMask;
+        uint32_t blueMask;
+        uint32_t alphaMask;
+#if (SDL_BYTEORDER == SDL_BIG_ENDIAN)
+        redMask = 0xff000000;
+        greenMask = 0x00ff0000;
+        blueMask = 0x0000ff00;
+        alphaMask = 0x000000ff;
+#else
+        redMask = 0x000000ff;
+        greenMask = 0x0000ff00;
+        blueMask = 0x00ff0000;
+        alphaMask = 0xff000000;
+#endif
+
+        const auto target{SDL_CreateRGBSurface(0,imageFrame.w, imageFrame.h, 32,
+            redMask, greenMask, blueMask, alphaMask)};
+
+        SDL_BlitSurface(source, &imageFrame, target, &imageFrame);
+        SDL_FreeSurface(source);
+
+        if (target->pixels) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, imageFrame.w, imageFrame.h, 0,
+                GL_RGBA, GL_UNSIGNED_BYTE, target->pixels);
+            glGenerateMipmap(GL_TEXTURE_2D);
+        }
+        SDL_FreeSurface(target);
     }
 
     void MeshesBuffer::draw(const GLsizei indices) const {
